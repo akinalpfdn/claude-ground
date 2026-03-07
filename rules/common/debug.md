@@ -19,11 +19,12 @@ This rule exists because brute-force debugging creates new bugs, masks the origi
 
 Before the third attempt, do this in order:
 
-1. **State the problem precisely.** What is the exact error or unexpected behavior? Not "it doesn't work" — what specifically is wrong?
-2. **State your assumptions.** What did you assume was true that might not be?
-3. **Identify what you do not know.** What information would change your approach?
-4. **Read the relevant code again.** Not from memory — actually re-read it.
-5. **Form a hypothesis.** "I believe the problem is X because Y."
+1. **Read the full error output.** The complete error message, stack trace, or log output — not a glance at the first line. The root cause is often buried in the middle or end of the output.
+2. **State the problem precisely.** What is the exact error or unexpected behavior? Not "it doesn't work" — what specifically is wrong?
+3. **State your assumptions.** What did you assume was true that might not be?
+4. **Identify what you do not know.** What information would change your approach?
+5. **Read the relevant code again.** Not from memory — actually re-read it.
+6. **Form a hypothesis.** "I believe the problem is X because Y."
 
 Only then make the next attempt — and it should be testing the hypothesis, not trying a different fix.
 

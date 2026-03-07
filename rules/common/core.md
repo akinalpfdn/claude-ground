@@ -138,6 +138,7 @@ Pick any:
 [ ] Project structure & hierarchy
 [ ] Dependency health
 [ ] Test coverage gaps
+[ ] Project-specific: ___ (ask the user what to check)
 ```
 
 Do not run all of them silently. Ask first. Run only what the user selects.

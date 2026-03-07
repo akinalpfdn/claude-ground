@@ -31,14 +31,14 @@ See `.claude/phases/` — always check the active phase file before starting wor
 <!-- @rules/common/frontend.md -->
 
 ### Language rules (uncomment what applies)
-<!-- @rules/languages/go.md -->
-<!-- @rules/languages/swift.md -->
-<!-- @rules/languages/typescript.md -->
-<!-- @rules/languages/kotlin.md -->
-<!-- @rules/languages/flutter.md -->
-<!-- @rules/languages/rust.md -->
-<!-- @rules/languages/dotnet.md -->
-<!-- @rules/languages/spring.md -->
+<!-- @rules/go/go.md -->
+<!-- @rules/swift/swift.md -->
+<!-- @rules/typescript/typescript.md -->
+<!-- @rules/kotlin/kotlin.md -->
+<!-- @rules/flutter/flutter.md -->
+<!-- @rules/rust/rust.md -->
+<!-- @rules/dotnet/dotnet.md -->
+<!-- @rules/spring/spring.md -->
 
 ## Project-Specific Constraints
 <!-- Things Claude must not do in this project. Add as you discover them. -->

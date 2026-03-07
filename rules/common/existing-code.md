@@ -74,5 +74,5 @@ If you want to delete code, confirm it is unreachable first. If unsure, comment 
 Existing code often encodes decisions that are not documented. When you discover them, surface them.
 
 **SHOULD:**
-- When you find a non-obvious pattern or constraint, note it in `DECISIONS.md` if it is not already documented.
+- When you find a non-obvious pattern or constraint, note it in `DECISIONS.md` if it is not already documented. If `DECISIONS.md` does not exist, add it to the `Context` section of `CLAUDE.md` or create `DECISIONS.md`.
 - When you change something that might break an undocumented assumption, flag it explicitly before making the change.

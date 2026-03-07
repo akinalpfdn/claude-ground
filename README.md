@@ -1,6 +1,6 @@
 # claude-ground
 
-A minimal rule system for Claude Code. Gives Claude the structural discipline it lacks by default — phase tracking, decision logging, honest pushback, and language-specific best practices.
+A minimal rule system for Claude Code. Gives Claude the structural discipline it lacks by default — phase tracking, decision logging, honest pushback, debug discipline, and language-specific best practices.
 
 ---
 
@@ -11,8 +11,10 @@ Claude Code is capable. But left to its own defaults it tends to:
 - Lose track of the original plan mid-implementation
 - Silently simplify or pivot when blocked, without asking
 - Agree with you when it should push back
+- Brute-force the same failed approach instead of stopping to think
+- Modify existing code without understanding it first
+- Skip tests or write superficial ones
 - Use inline styles, hardcoded colors, and generic AI aesthetics
-- Estimate time in human weeks instead of Claude sessions
 
 These aren't model failures — they're defaults that go unchallenged without explicit rules.
 
@@ -20,33 +22,32 @@ These aren't model failures — they're defaults that go unchallenged without ex
 
 ## What this does
 
-**`rules/common/`** — Loaded globally, active in every project:
+**`rules/common/`** — Always active, every project:
 
-- **Phase management** — One active phase at a time. Each phase is a file. Done phases are renamed, not deleted. Claude re-reads the active phase when context fills, so it never loses the plan.
-- **Decision logging** — Every non-trivial technical choice gets written to `DECISIONS.md`: what was chosen, what was rejected, and why.
-- **Approval gates** — Claude stops and presents options when blocked. It does not simplify silently.
-- **Honest opposition** — Claude states disagreements directly, shows trade-offs even when you seem committed to an idea.
-- **Time estimates** — In Claude sessions, not human weeks.
-- **Periodic analysis** — At phase boundaries, Claude offers to check performance, security, SOLID violations, modularity, or structure — whichever you choose.
+| Rule file | What it does |
+|-----------|-------------|
+| `core.md` | Phase management, approval gates, honest opposition, time estimates, periodic analysis |
+| `decisions.md` | Decision log format and rules |
+| `git.md` | Branch strategy, conventional commits, commit discipline, versioning |
+| `testing.md` | When to test, naming, structure, mocks vs integration, coverage |
+| `debug.md` | Two-attempt rule, structured analysis, no error masking |
+| `existing-code.md` | Read before touch, follow existing patterns, separate refactoring from features |
+| `frontend.md` | Theme-first, no inline styles, intentional design (UI projects only) |
 
-**`rules/common/frontend.md`** — For UI projects:
-
-- No inline styles, colors, or fonts. Theme tokens first, components second.
-- No generic AI aesthetics. A design direction is chosen before writing code.
-- Centralized strings from day one.
-
-**`rules/languages/`** — Language-specific best practices:
+**`rules/[language]/`** — Language-specific best practices:
 
 | Language | Key rules |
 |----------|-----------|
-| Go | Context propagation, goroutine lifecycle, error wrapping, package structure |
-| Swift | MVVM structure, actor/async-await, memory management, project layout |
-| TypeScript | Component granularity, API layer separation, strict types, state discipline |
-| Kotlin | Coroutine scopes, ViewModel/UI state, Compose theming, repository pattern |
-| Flutter | Widget granularity, state management consistency, AppTheme, platform isolation |
-| Rust | Ownership patterns, thiserror/anyhow, tokio consistency, unsafe discipline |
-| .NET | Constructor DI, layered architecture, async conventions, API versioning |
-| Spring | Constructor injection, repository/service separation, exception handling, transactions |
+| Go | Goroutine lifecycle, error wrapping, interface design, package structure, table-driven tests |
+| Swift | MVVM structure, async/await + actors, memory management, error handling, testable ViewModels |
+| TypeScript | Component granularity, API layer separation, strict types, state discipline, RTL testing |
+| Kotlin | Coroutine scopes, sealed UI state, Compose theming, repository pattern, coroutine testing |
+| Flutter | Widget granularity, state management, AppTheme, platform isolation, widget/golden tests |
+| Rust | Ownership patterns, thiserror/anyhow, tokio consistency, unsafe discipline, proptest |
+| .NET | Constructor DI, layered architecture, async + CancellationToken, Result pattern, Testcontainers |
+| Spring | Constructor injection, layered architecture, exception handling, transactions, Testcontainers |
+
+All rules use **MUST / SHOULD / RECOMMENDED** severity levels so Claude knows what is a hard rule vs a best practice.
 
 **`templates/`** — Starting point for new projects:
 
@@ -58,38 +59,36 @@ These aren't model failures — they're defaults that go unchallenged without ex
 
 ## Install
 
+Two things get installed — they go to different places:
+
+| What | Where | Effect |
+|------|-------|--------|
+| **Rules** | `~/.claude/rules/` (global) | Active in every project, every session |
+| **Templates** | Current working directory | CLAUDE.md, DECISIONS.md, phases/ for one project |
+
+Rules are always global. Templates are always local to whatever directory you run the command from.
+
+### Step 1 — Install rules (once)
+
 ```bash
-git clone https://github.com/your-username/claude-ground
+git clone https://github.com/akinalpfdn/claude-ground
 cd claude-ground
-node install.js
+node install.js                    # interactive — pick languages, UI yes/no
+node install.js go typescript      # non-interactive — specify languages directly
 ```
 
-Or specify languages directly (non-interactive):
-
-```bash
-node install.js go swift
-node install.js typescript kotlin
-node install.js --project go   # project-scoped, installs to .claude/rules/
-```
+This installs common rules + your chosen language rules to `~/.claude/rules/`. Done once, works everywhere.
 
 No dependencies. Uses only Node.js built-ins — no `npm install` needed.
 
-**Global install** — rules go to `~/.claude/rules/`, active in all projects.  
-**Project install** (`--project`) — rules go to `.claude/rules/`, active in this project only.
-
-Common rules are always installed. You choose which language rules to add.
-
----
-
-## Project setup
-
-After installing, run from your project directory:
+### Step 2 — Set up a project (per project)
 
 ```bash
-node /path/to/claude-ground/install.js --project go
+cd your-project
+node /path/to/claude-ground/install.js --templates
 ```
 
-Answer `y` when asked about templates. This creates:
+This creates project files in your current directory:
 
 ```
 your-project/
@@ -100,9 +99,21 @@ your-project/
         └── PHASE-01-active.md       ← define your first phase
 ```
 
+You can combine both steps if starting fresh:
+
+```bash
+cd your-project
+node /path/to/claude-ground/install.js --templates go swift
+```
+
+This installs go + swift rules globally AND creates templates in the current directory.
+
+### Step 3 — Fill in CLAUDE.md
+
 Open `CLAUDE.md` and fill in:
 - What the project does
 - Your tech stack and why
+- Uncomment the language rules that apply
 - Any project-specific constraints for Claude
 
 ---
@@ -129,14 +140,32 @@ Claude checks the active phase file before continuing work. It will not start th
 
 ```
 claude-ground/
-├── install.sh
+├── install.js
 ├── rules/
 │   ├── common/
-│   │   ├── core.md          # phase management, approval gates, honest pushback
-│   │   ├── frontend.md      # theme-first, no inline styles, no generic aesthetics
-│   │   └── decisions.md     # decision log format and rules
-│   └── [language]/
-│       └── [language].md
+│   │   ├── core.md            # phase management, approval gates, honest pushback
+│   │   ├── decisions.md       # decision log format and rules
+│   │   ├── git.md             # branch strategy, commits, versioning
+│   │   ├── testing.md         # test discipline, naming, coverage
+│   │   ├── debug.md           # two-attempt rule, structured analysis
+│   │   ├── existing-code.md   # read before touch, pattern respect
+│   │   └── frontend.md        # theme-first, intentional design (UI only)
+│   ├── go/
+│   │   └── go.md
+│   ├── swift/
+│   │   └── swift.md
+│   ├── typescript/
+│   │   └── typescript.md
+│   ├── kotlin/
+│   │   └── kotlin.md
+│   ├── flutter/
+│   │   └── flutter.md
+│   ├── rust/
+│   │   └── rust.md
+│   ├── dotnet/
+│   │   └── dotnet.md
+│   └── spring/
+│       └── spring.md
 └── templates/
     ├── CLAUDE.md
     ├── DECISIONS.md
@@ -152,5 +181,6 @@ Rules should be:
 - Specific enough to change behavior, not just remind Claude of good practices
 - Language-idiomatic — written from the perspective of someone who knows the ecosystem well
 - Free of code snippets that Claude would write anyway
+- Tagged with severity: **MUST** (hard rule), **SHOULD** (best practice), **RECOMMENDED** (nice to have)
 
 New language rules, corrections, and improvements are welcome.
