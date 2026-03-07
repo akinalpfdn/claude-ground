@@ -12,18 +12,25 @@
 | Infrastructure | | |
 
 ## Architecture
-[Brief description of the overall structure. Key components and how they relate.]
+[Brief description. Key components and how they relate.]
 
 ## Current Phase
 See `.claude/phases/` — always check the active phase file before starting work.
 
 ## Rules
+
+### Always active
 @rules/common/core.md
 @rules/common/decisions.md
-<!-- Add if UI project: -->
+@rules/common/git.md
+@rules/common/testing.md
+@rules/common/debug.md
+@rules/common/existing-code.md
+
+### UI projects only (remove if backend-only)
 <!-- @rules/common/frontend.md -->
 
-<!-- Add your language rule: -->
+### Language rules (uncomment what applies)
 <!-- @rules/languages/go.md -->
 <!-- @rules/languages/swift.md -->
 <!-- @rules/languages/typescript.md -->
@@ -33,12 +40,8 @@ See `.claude/phases/` — always check the active phase file before starting wor
 <!-- @rules/languages/dotnet.md -->
 <!-- @rules/languages/spring.md -->
 
-## What NOT To Do
-<!-- Project-specific constraints. Add as you discover them. -->
-- Do not simplify or pivot without explicit approval
-- Do not inline styles, colors, or fonts
-- Do not start the next phase without user sign-off
+## Project-Specific Constraints
+<!-- Things Claude must not do in this project. Add as you discover them. -->
 
 ## Context
-<!-- Anything Claude needs to know that isn't obvious from the code. -->
-<!-- Target platform, known constraints, team conventions, etc. -->
+<!-- Anything not obvious from the code: target platform, known constraints, current focus. -->

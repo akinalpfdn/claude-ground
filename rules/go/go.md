@@ -1,17 +1,15 @@
 # Go Rules
 
-Extends `common/core.md`. These rules apply to every Go project.
+Extends `common/` rules. Only rules that change behavior — not reminders of things already done correctly.
 
 ---
 
-## 1. Goroutine & Context
+## 1. Goroutine Lifecycle [MUST]
 
-Every goroutine MUST have a defined exit condition. No goroutine is launched without one of:
-- A `context.Context` cancellation path
-- A done channel
-- A WaitGroup with a clear completion signal
+Every goroutine MUST have a visible exit condition before it is written. If you cannot point to the exit condition, do not write the goroutine yet — design it first.
 
-`context.Context` is always the first parameter of any function that may block, do I/O, or spawn goroutines:
+`context.Context` is the first parameter of any function that may block, do I/O, or spawn goroutines. No exceptions.
+
 ```go
 // Correct
 func FetchUser(ctx context.Context, id string) (*User, error)
@@ -22,100 +20,78 @@ func FetchUser(id string) (*User, error)
 
 Never store context in a struct. Pass it explicitly every time.
 
-If you cannot see a clear exit path for a goroutine, stop and ask before writing it.
+Stored goroutines (launched and not immediately awaited) require a cancellation path. If you are launching a goroutine that runs "until the app shuts down," there must be a shutdown signal it responds to.
 
 ---
 
-## 2. Error Handling
+## 2. Error Wrapping [MUST]
 
-Every error returned from a function boundary MUST be wrapped with context:
+Every error crossing a function boundary is wrapped with context:
+
 ```go
 // Correct
 return fmt.Errorf("fetchUser %s: %w", id, err)
 
-// Forbidden
+// Forbidden — loses call site context
 return err
 ```
 
-Errors are defined as package-level sentinel values or typed errors — not raw strings:
+Sentinel errors are package-level variables, not inline strings:
 ```go
 var ErrNotFound = errors.New("not found")
 ```
 
-Use `errors.Is` and `errors.As` for matching. Never compare error strings.
+`errors.Is` and `errors.As` for matching. Never compare `.Error()` strings.
 
-Ignoring errors with `_` is forbidden unless the function is documented as safe to ignore and the reason is commented inline.
+Ignoring errors with `_` requires an inline comment explaining why it is safe.
 
 ---
 
-## 3. Interface Design
+## 3. Interface Design [MUST]
 
 Interfaces are defined at the point of consumption, not at the point of implementation.
 
-Interfaces are small and focused — one to three methods maximum. If an interface has more than three methods, split it unless there is a documented reason not to.
+Maximum three methods per interface. If you need more, split — unless there is a documented reason not to.
 
-```go
-// Correct — small, focused
-type UserReader interface {
-    GetUser(ctx context.Context, id string) (*User, error)
-}
-
-// Forbidden — too broad
-type UserService interface {
-    GetUser(ctx context.Context, id string) (*User, error)
-    CreateUser(ctx context.Context, u *User) error
-    DeleteUser(ctx context.Context, id string) error
-    ListUsers(ctx context.Context) ([]*User, error)
-    UpdateUser(ctx context.Context, u *User) error
-}
-```
-
-Do not create interfaces speculatively. Create them when you have at least two implementations or a clear testing need.
+Do not create interfaces speculatively. Create them when you have two implementations or a concrete testing need.
 
 ---
 
-## 4. Package Structure
+## 4. Package Structure [MUST]
 
-Packages are organized by domain, not by type. No `models/`, `utils/`, `helpers/` packages.
+Packages are organized by domain, never by type:
 
 ```
 // Correct
-internal/
-  user/
-    handler.go
-    service.go
-    repository.go
-    errors.go
-  order/
-    handler.go
-    service.go
+internal/user/handler.go
+internal/user/service.go
+internal/order/handler.go
 
 // Forbidden
-models/
-  user.go
-  order.go
-utils/
-  helpers.go
+models/user.go
+utils/helpers.go
 ```
 
-`internal/` is used for packages not meant to be imported externally. Default to `internal/` unless external import is explicitly required.
+`internal/` by default. External packages require a documented reason.
 
-Package names are lowercase, single words, no underscores. If you need two words, the package boundary is probably wrong.
-
-Circular imports are never solved by merging packages. Stop and redesign if a circular dependency appears.
+Circular imports are never resolved by merging packages. Stop and redesign.
 
 ---
 
-## 5. Concurrency Patterns
+## 5. Testing [SHOULD]
 
-Prefer channels for ownership transfer, mutexes for shared state protection. Do not mix them on the same data.
+Table-driven tests for all functions with multiple input cases:
 
-`sync.Mutex` is always unlocked with `defer`:
 ```go
-mu.Lock()
-defer mu.Unlock()
+tests := []struct {
+    name    string
+    input   string
+    want    *User
+    wantErr bool
+}{
+    {"valid id", "abc", &User{}, false},
+    {"empty id", "", nil, true},
+}
 ```
 
-`sync.WaitGroup` Add is called before the goroutine is launched, not inside it.
-
-Race conditions are caught with `-race` flag. Run `go test -race ./...` before marking any concurrent code complete.
+Run `go test -race ./...` before marking any concurrent code complete. Race conditions in tests are bugs, not test flakiness.

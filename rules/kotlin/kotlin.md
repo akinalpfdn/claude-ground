@@ -1,31 +1,29 @@
 # Kotlin / Android Rules
 
-Extends `common/core.md` and `common/frontend.md`. These rules apply to every Kotlin/Android project.
+Extends `common/` rules and `common/frontend.md`.
 
 ---
 
-## 1. Coroutine Scope Management
+## 1. Coroutine Scope [MUST]
 
-Every coroutine is launched from the correct scope. No exceptions.
+Every coroutine is launched from the correct scope:
 
-| Where | Scope to use |
-|-------|-------------|
+| Context | Scope |
+|---------|-------|
 | ViewModel | `viewModelScope` |
 | Activity / Fragment | `lifecycleScope` |
-| Repository / Service | Injected `CoroutineScope` or `suspend fun` only |
-| Application-level | `applicationScope` (custom, injected) |
+| Repository / Service | `suspend fun` — no scope, inherits from caller |
+| App-level background work | Injected `CoroutineScope` |
 
 `GlobalScope` is forbidden. If you think you need it, stop and ask.
 
-`suspend fun` does not need its own scope — it inherits from the caller. Do not launch coroutines inside suspend functions unless creating structured children with `coroutineScope {}`.
-
-All coroutines that can fail have explicit error handling — either `try/catch` or `CoroutineExceptionHandler`. Silent failures are not acceptable.
+`suspend fun` does not launch coroutines internally unless creating structured children with `coroutineScope {}`.
 
 ---
 
-## 2. ViewModel & UI State
+## 2. UI State as Sealed Class [MUST]
 
-ViewModel exposes a single UI state sealed class, not multiple LiveData/StateFlow fields:
+ViewModel exposes a single sealed class for UI state — not multiple separate `StateFlow` fields:
 
 ```kotlin
 sealed class UserProfileState {
@@ -34,71 +32,50 @@ sealed class UserProfileState {
     data class Error(val message: String) : UserProfileState()
 }
 
-private val _state = MutableStateFlow<UserProfileState>(Loading)
 val state: StateFlow<UserProfileState> = _state.asStateFlow()
 ```
 
-UI observes state. UI does not contain logic. If there is an `if` statement in a composable that is not about layout, it belongs in the ViewModel.
+If a composable contains an `if` statement that is not about layout, it belongs in the ViewModel.
 
-ViewModel does not reference Android framework classes (Context, Activity, View). If you need Context, use `ApplicationContext` injected via Hilt — never passed directly.
+ViewModel never references Android framework classes directly. Context is injected via Hilt as `ApplicationContext` only.
 
 ---
 
-## 3. Jetpack Compose Theme
+## 3. Compose Theme [MUST]
 
-`MaterialTheme` is extended, not bypassed. All colors, typography, and shapes are defined in the theme:
+All colors, typography, and shapes are defined in the theme — never hardcoded in composables:
 
 ```
-ui/
-  theme/
-    Color.kt
-    Typography.kt
-    Shape.kt
-    Theme.kt      ← AppTheme composable
+ui/theme/
+  Color.kt
+  Typography.kt
+  Shape.kt
+  Theme.kt    ← AppTheme composable
 ```
 
-`AppTheme {}` wraps the entire app. No component uses hardcoded color values or `TextStyle` inline.
+Dark/light theme support is configured from project start. Not retrofitted later.
 
-Custom design tokens that don't map to MaterialTheme slots use `CompositionLocal`:
+---
+
+## 4. Repository Pattern [MUST]
+
+ViewModel never accesses a data source directly. Every data source is behind a repository interface defined in the domain layer, implemented in infrastructure.
+
+Domain models never contain `@SerializedName` or `@ColumnInfo`. Mapping happens in the repository.
+
+---
+
+## 5. Testing [SHOULD]
+
+ViewModel tests use `kotlinx-coroutines-test` with `TestCoroutineDispatcher`. Every ViewModel test replaces the main dispatcher:
+
 ```kotlin
-val LocalAppSpacing = staticCompositionLocalOf { AppSpacing() }
+@Before
+fun setup() {
+    Dispatchers.setMain(testDispatcher)
+}
 ```
 
-Dark/light theme support is handled at the theme level from day one. Not retrofitted later.
+Repository tests use a real in-memory database (Room's `inMemoryDatabaseBuilder`) — not mocked DAOs. Mocked DAOs test nothing meaningful.
 
----
-
-## 4. Repository Pattern
-
-Every data source is behind a repository interface. ViewModel never calls a data source directly.
-
-```
-data/
-  repository/
-    UserRepository.kt          ← interface
-    UserRepositoryImpl.kt      ← implementation
-  remote/
-    UserApiService.kt
-  local/
-    UserDao.kt
-
-domain/
-  model/
-    User.kt                    ← domain model, not API/DB model
-  usecase/
-    GetUserUseCase.kt          ← optional, for complex logic
-
-ui/
-  userprofile/
-    UserProfileViewModel.kt    ← calls repository only
-```
-
-Mapping between API/DB models and domain models happens in the repository layer. Domain models never contain `@SerializedName` or `@ColumnInfo` annotations.
-
----
-
-## 5. Dependency Injection
-
-Hilt is the DI solution. No manual DI, no service locator pattern, no singletons via `object` unless genuinely stateless utilities.
-
-Every dependency is injected through the constructor. `@Inject lateinit var` in Activities/Fragments is acceptable only for Android framework entry points.
+UI tests use Compose testing APIs (`composeTestRule.onNodeWithText`), not legacy Espresso for Compose screens.

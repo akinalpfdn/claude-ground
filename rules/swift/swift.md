@@ -1,130 +1,80 @@
 # Swift Rules
 
-Extends `common/core.md` and `common/frontend.md`. These rules apply to every Swift/SwiftUI project.
+Extends `common/` rules. Assumes SwiftUI + modern Swift (5.9+).
 
 ---
 
-## 1. SwiftUI + MVVM Structure
+## 1. MVVM Structure [MUST]
 
-Every screen has exactly one ViewModel. Views are passive — they render state, they do not compute it.
+Every screen has exactly one ViewModel. Views render state — they do not compute it.
 
 ```
-Features/
-  UserProfile/
-    UserProfileView.swift
-    UserProfileViewModel.swift
-    UserProfileModel.swift   ← data types only
+Features/UserProfile/
+  UserProfileView.swift        ← layout only
+  UserProfileViewModel.swift   ← all logic, all async calls, all state
 ```
-
-ViewModel is an `@Observable` class (Swift 5.9+) or `ObservableObject`. It owns:
-- All business logic
-- All async calls
-- All state that drives the view
-
-Views own:
-- Layout
-- Animations
-- Navigation triggers (but not navigation logic)
 
 If a View contains a function that does anything other than format data for display, move it to the ViewModel.
 
----
+ViewModel is `@Observable` (Swift 5.9+) or `ObservableObject`. It is explicitly annotated `@MainActor`:
 
-## 2. Actor & Async/Await
-
-`@MainActor` is applied to ViewModels explicitly, not assumed:
 ```swift
 @MainActor
 final class UserProfileViewModel: ObservableObject { }
 ```
 
-All async work is done inside `Task {}` blocks, never with `DispatchQueue.main.async` in new code.
+---
 
-Structured concurrency is preferred over unstructured. Use `async let` for parallel work, `TaskGroup` for dynamic parallelism.
+## 2. Async/Await & Actor [MUST]
 
-Every `Task` that is stored must be cancelled on deinit:
+All async work runs inside `Task {}` blocks. No `DispatchQueue.main.async` in new code.
+
+Every stored `Task` is cancelled on deinit:
 ```swift
 private var loadTask: Task<Void, Never>?
-
-deinit {
-    loadTask?.cancel()
-}
+deinit { loadTask?.cancel() }
 ```
 
-Do not use `Task.detached` unless you explicitly need to escape the current actor context and can document why.
+`Task.detached` requires a comment explaining why escaping the current actor context is necessary.
 
 ---
 
-## 3. Memory Management
-
-`weak` is used for delegate references and closure captures where the referenced object has an equal or shorter lifetime than the closure.
-
-`unowned` is only used when you can guarantee the referenced object outlives the closure — document this guarantee inline when you use it.
+## 3. Memory Management [MUST]
 
 Capture lists are explicit in every escaping closure:
 ```swift
 // Correct
-Task { [weak self] in
-    await self?.loadData()
-}
+Task { [weak self] in await self?.load() }
 
 // Forbidden — implicit capture
-Task {
-    await loadData()
-}
+Task { await load() }
 ```
 
-Retain cycles are checked whenever a closure is stored as a property. If a stored closure captures `self`, `self` must be `weak` or `unowned`.
+`unowned` requires an inline comment guaranteeing the referenced object outlives the closure. If you cannot write that comment confidently, use `weak`.
 
 ---
 
-## 4. Project Structure
+## 4. Error Handling [SHOULD]
 
-```
-App/
-  AppEntry.swift         ← @main only
-  AppCoordinator.swift   ← root navigation
+Errors are enums conforming to `LocalizedError`. `try!` is forbidden in production. `try?` requires a comment explaining why discarding the error is intentional.
 
-Core/
-  Network/
-  Storage/
-  Theme/                 ← colors, typography, spacing (see frontend rules)
-
-Features/
-  [FeatureName]/
-    [Feature]View.swift
-    [Feature]ViewModel.swift
-
-Shared/
-  Components/            ← reusable UI primitives
-  Extensions/
-  Models/
-```
-
-No business logic in `AppEntry` or App-level files. Coordinator or root ViewModel handles navigation.
-
----
-
-## 5. Error Handling
-
-Define errors as enums conforming to `LocalizedError`:
-```swift
-enum UserError: LocalizedError {
-    case notFound(id: String)
-    case unauthorized
-
-    var errorDescription: String? {
-        switch self {
-        case .notFound(let id): return "User \(id) not found"
-        case .unauthorized: return "Unauthorized"
-        }
-    }
-}
-```
-
-Do not use `try!` in production code. Ever. Use `try?` only when nil is a valid handled outcome and the error is intentionally discarded — comment why.
-
-ViewModels expose errors as published state, not as thrown errors:
+ViewModels expose errors as published state, not thrown errors:
 ```swift
 @Published var errorMessage: String?
 ```
+
+---
+
+## 5. Testing [SHOULD]
+
+ViewModels are testable without launching the full app. Dependencies are injected, not created inside the ViewModel:
+
+```swift
+// Correct
+init(userService: UserServiceProtocol) { self.userService = userService }
+
+// Forbidden — untestable
+init() { self.userService = UserService() }
+```
+
+Test async ViewModel behavior with `MainActor.run {}` in test bodies.

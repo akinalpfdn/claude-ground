@@ -3,21 +3,19 @@
 // Works on macOS, Linux, and Windows.
 //
 // Usage:
-//   node install.js                    # interactive mode
-//   node install.js go swift           # specify languages directly
-//   node install.js --project          # project-scoped install (.claude/rules/)
-//   node install.js --project go swift
+//   node install.js                       # interactive mode (global rules)
+//   node install.js go swift              # specify languages directly
+//   node install.js --templates           # project templates only (no rules)
+//   node install.js --templates go swift  # global rules + project templates
 
 const fs = require("fs");
 const path = require("path");
 const readline = require("readline");
 
-// --- Paths ---
 const SCRIPT_DIR = __dirname;
 const RULES_DIR = process.env.CLAUDE_GROUND_RULES_DIR || path.join(SCRIPT_DIR, "rules");
 const TEMPLATES_DIR = process.env.CLAUDE_GROUND_TEMPLATES_DIR || path.join(SCRIPT_DIR, "templates");
 
-// --- Colors (disabled on Windows if no ANSI support) ---
 const supportsColor = process.platform !== "win32" || process.env.TERM;
 const c = {
   red:    supportsColor ? "\x1b[31m" : "",
@@ -28,63 +26,46 @@ const c = {
   reset:  supportsColor ? "\x1b[0m"  : "",
 };
 
-const ok  = `  ${c.green}✓${c.reset}`;
-const err = `  ${c.red}✗${c.reset}`;
+const ok   = `  ${c.green}✓${c.reset}`;
+const fail = `  ${c.red}✗${c.reset}`;
 const warn = `  ${c.yellow}!${c.reset}`;
 const line = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
 
-// --- Helpers ---
 function copyDir(src, dest) {
   fs.mkdirSync(dest, { recursive: true });
   for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
-    const srcPath = path.join(src, entry.name);
-    const destPath = path.join(dest, entry.name);
-    if (entry.isDirectory()) copyDir(srcPath, destPath);
-    else fs.copyFileSync(srcPath, destPath);
+    const s = path.join(src, entry.name);
+    const d = path.join(dest, entry.name);
+    if (entry.isDirectory()) copyDir(s, d);
+    else fs.copyFileSync(s, d);
   }
 }
 
-function exists(p) {
-  return fs.existsSync(p);
-}
+function exists(p) { return fs.existsSync(p); }
+function isDirEmpty(p) { return !exists(p) || fs.readdirSync(p).length === 0; }
+function ask(rl, q) { return new Promise((res) => rl.question(q, res)); }
 
-function isDirEmpty(p) {
-  return !exists(p) || fs.readdirSync(p).length === 0;
-}
-
-function ask(rl, question) {
-  return new Promise((resolve) => rl.question(question, resolve));
-}
-
-// --- Discover available languages ---
 const availableLangs = fs
   .readdirSync(RULES_DIR, { withFileTypes: true })
   .filter((d) => d.isDirectory() && d.name !== "common")
   .map((d) => d.name);
 
-// --- Parse args ---
-let target = "global";
+let withTemplates = false;
 let args = process.argv.slice(2);
-
-if (args[0] === "--project") {
-  target = "project";
+if (args[0] === "--templates") {
+  withTemplates = true;
   args = args.slice(1);
 }
 
 const homeDir = process.env.HOME || process.env.USERPROFILE;
-const destDir =
-  target === "global"
-    ? process.env.CLAUDE_RULES_DIR || path.join(homeDir, ".claude", "rules")
-    : path.join(process.cwd(), ".claude", "rules");
+const globalDest = process.env.CLAUDE_RULES_DIR || path.join(homeDir, ".claude", "rules");
 
-// --- Main ---
 async function main() {
   let selectedLangs = [];
   let hasUI = false;
-  let installTemplates = false;
 
+  // --- Rules ---
   if (args.length > 0) {
-    // Non-interactive: validate and use args
     for (const lang of args) {
       if (!/^[a-zA-Z0-9_-]+$/.test(lang)) {
         console.error(`${c.red}Error: invalid language name '${lang}'${c.reset}`);
@@ -98,28 +79,18 @@ async function main() {
       selectedLangs.push(lang);
     }
   } else {
-    // Interactive mode
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
     console.log();
     console.log(`${c.bold}claude-ground installer${c.reset}`);
     console.log(line);
-    console.log();
-
-    if (target === "global") {
-      console.log(`Target: ${c.cyan}global${c.reset} → ${destDir}`);
-      console.log("Active across all projects.");
-    } else {
-      console.log(`Target: ${c.cyan}project${c.reset} → ${destDir}`);
-      console.log("Active in this project only.");
-    }
-
+    console.log(`Target: ${c.cyan}global${c.reset} → ${globalDest}`);
+    console.log("Active across all projects.");
     console.log();
     console.log(`${c.bold}Which languages do you want rules for?${c.reset}`);
     console.log(`${c.yellow}common/ rules are always installed.${c.reset}`);
     console.log();
-    console.log('Space-separated list (e.g: go swift typescript)');
-    console.log("For all: all");
+    console.log("Space-separated (e.g: go swift typescript) — or: all");
     console.log();
     console.log("Available languages:");
     for (const lang of availableLangs) console.log(`  • ${lang}`);
@@ -140,58 +111,79 @@ async function main() {
       }
     }
 
-    const uiAnswer = await ask(rl, "\nDoes this project have a UI? (adds frontend rules) [y/N]: ");
-    hasUI = /^y/i.test(uiAnswer.trim());
+    const uiAns = await ask(rl, "\nDoes this project have a UI? (adds frontend rules) [y/N]: ");
+    hasUI = /^y/i.test(uiAns.trim());
 
-    const tmplAnswer = await ask(rl, "\nCopy project templates too? (CLAUDE.md, DECISIONS.md, phases/) [y/N]: ");
-    installTemplates = /^y/i.test(tmplAnswer.trim());
+    if (!withTemplates) {
+      const tmplAns = await ask(rl, "Set up project templates too? (CLAUDE.md, DECISIONS.md, phases/) [y/N]: ");
+      withTemplates = /^y/i.test(tmplAns.trim());
+    }
 
     rl.close();
   }
 
-  // --- Install ---
+  // Install rules
   console.log();
-  console.log(`${c.bold}Installing...${c.reset}`);
+  console.log(`${c.bold}Installing rules...${c.reset}`);
   console.log(line);
 
-  if (exists(destDir) && !isDirEmpty(destDir)) {
-    console.log(`${c.yellow}Warning: ${destDir} already exists. Files will be overwritten.${c.reset}`);
+  if (exists(globalDest) && !isDirEmpty(globalDest)) {
+    console.log(`${c.yellow}Warning: ${globalDest} already exists. Files will be overwritten.${c.reset}`);
   }
 
-  // common/ always installed
-  copyDir(path.join(RULES_DIR, "common"), path.join(destDir, "common"));
-  console.log(`${ok} common rules → ${destDir}/common/`);
+  copyDir(path.join(RULES_DIR, "common"), path.join(globalDest, "common"));
+  console.log(`${ok} common → ${globalDest}/common/`);
 
+  // frontend.md only for UI projects
+  const frontendDest = path.join(globalDest, "common", "frontend.md");
   if (hasUI) {
     console.log(`${ok} frontend rules included (common/frontend.md)`);
+  } else {
+    if (exists(frontendDest)) fs.unlinkSync(frontendDest);
+    console.log(`  — frontend rules skipped (backend-only project)`);
   }
 
-  // Selected languages
   for (const lang of selectedLangs) {
     const langDir = path.join(RULES_DIR, lang);
-    if (!exists(langDir)) {
-      console.log(`${err} No rules for '${lang}', skipping.`);
-      continue;
-    }
-    copyDir(langDir, path.join(destDir, lang));
-    console.log(`${ok} ${lang} → ${destDir}/${lang}/`);
+    if (!exists(langDir)) { console.log(`${fail} No rules for '${lang}', skipping.`); continue; }
+    copyDir(langDir, path.join(globalDest, lang));
+    console.log(`${ok} ${lang} → ${globalDest}/${lang}/`);
   }
 
-  // Templates
-  if (installTemplates) {
+  // --- Templates ---
+  if (withTemplates) {
     console.log();
+    console.log(`${c.bold}Setting up project templates...${c.reset}`);
+    console.log(line);
+
     const projectDir = process.cwd();
     const claudeDir = path.join(projectDir, ".claude");
-
     const claudeMdDest = path.join(projectDir, "CLAUDE.md");
+    const decisionsDest = path.join(projectDir, "DECISIONS.md");
+    const phasesDir = path.join(claudeDir, "phases");
+
+    // CLAUDE.md — smart: if exists, show what to add instead of overwriting
     if (exists(claudeMdDest)) {
-      console.log(`${warn} CLAUDE.md already exists, skipping. (edit manually)`);
+      const refs = [
+        "@rules/common/core.md",
+        "@rules/common/decisions.md",
+        "@rules/common/git.md",
+        "@rules/common/testing.md",
+        "@rules/common/debug.md",
+        "@rules/common/existing-code.md",
+      ];
+      if (hasUI) refs.push("@rules/common/frontend.md");
+      for (const lang of selectedLangs) refs.push(`@rules/${lang}/${lang}.md`);
+
+      console.log(`${warn} CLAUDE.md already exists. Add these lines to activate claude-ground:`);
+      console.log();
+      for (const ref of refs) console.log(`      ${c.cyan}${ref}${c.reset}`);
+      console.log();
     } else {
       fs.copyFileSync(path.join(TEMPLATES_DIR, "CLAUDE.md"), claudeMdDest);
       console.log(`${ok} CLAUDE.md → project root`);
     }
 
-    const decisionsDest = path.join(projectDir, "DECISIONS.md");
     if (exists(decisionsDest)) {
       console.log(`${warn} DECISIONS.md already exists, skipping.`);
     } else {
@@ -199,7 +191,6 @@ async function main() {
       console.log(`${ok} DECISIONS.md → project root`);
     }
 
-    const phasesDir = path.join(claudeDir, "phases");
     if (exists(phasesDir)) {
       console.log(`${warn} .claude/phases/ already exists, skipping.`);
     } else {
@@ -212,24 +203,23 @@ async function main() {
     }
   }
 
-  // Summary
+  // --- Summary ---
   console.log();
   console.log(line);
   console.log(`${c.green}${c.bold}Done.${c.reset}`);
   console.log();
-  console.log(`Rules installed to: ${c.cyan}${destDir}${c.reset}`);
-  if (selectedLangs.length > 0) {
-    console.log(`Languages: ${c.cyan}${selectedLangs.join(", ")}${c.reset}`);
-  }
+  console.log(`Rules installed to: ${c.cyan}${globalDest}${c.reset}`);
+  if (selectedLangs.length > 0) console.log(`Languages: ${c.cyan}${selectedLangs.join(", ")}${c.reset}`);
   console.log();
   console.log("Next steps:");
-  console.log("  1. Fill in CLAUDE.md with your project details");
-  console.log("  2. Define your first phase in .claude/phases/PHASE-01-active.md");
-  console.log("  3. Log your initial stack decision in DECISIONS.md");
+  if (withTemplates) {
+    console.log("  1. Fill in CLAUDE.md with your project details");
+    console.log("  2. Define your first phase in .claude/phases/PHASE-01-active.md");
+    console.log("  3. Log your initial stack decision in DECISIONS.md");
+  } else {
+    console.log("  Run with --templates from your project directory to set up CLAUDE.md and phases.");
+  }
   console.log();
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+main().catch((e) => { console.error(e); process.exit(1); });

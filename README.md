@@ -59,7 +59,7 @@ These aren't model failures — they're defaults that go unchallenged without ex
 ## Install
 
 ```bash
-git clone https://github.com/akinalpfdn/claude-ground
+git clone https://github.com/your-username/claude-ground
 cd claude-ground
 node install.js
 ```

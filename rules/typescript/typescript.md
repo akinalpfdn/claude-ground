@@ -1,118 +1,76 @@
 # TypeScript / React Rules
 
-Extends `common/core.md` and `common/frontend.md`. These rules apply to every TypeScript/React project.
+Extends `common/` rules and `common/frontend.md`.
 
 ---
 
-## 1. Component Granularity
+## 1. Component Granularity [MUST]
 
-One component, one responsibility. If a component:
-- Fetches data AND renders it → split
-- Manages form state AND displays results → split
-- Has more than one reason to re-render → split
+One component, one responsibility. A component that fetches AND renders, or manages form state AND displays results, must be split.
 
-Component size is a smell, not a rule — but components over 150 lines almost always have hidden responsibilities. Review them.
+Page-level components are thin composers — no logic, only layout and composition.
 
 ```
-features/
-  UserProfile/
-    UserProfilePage.tsx       ← route entry, composes below
-    UserProfileHeader.tsx
-    UserProfileStats.tsx
-    useUserProfile.ts         ← all data fetching / state
-    userProfile.types.ts
+features/UserProfile/
+  UserProfilePage.tsx     ← route entry, composes below
+  UserProfileHeader.tsx
+  UserProfileStats.tsx
+  useUserProfile.ts       ← all data fetching and state
+  userProfile.types.ts
 ```
-
-Page-level components are thin composers. They do not contain logic.
 
 ---
 
-## 2. State Management
+## 2. API Layer Separation [MUST]
 
-Local state (`useState`) is for UI-only concerns: open/closed, hover, input value before submit.
+Network calls are never made directly inside components.
 
-Server state (anything fetched) uses a dedicated library — React Query, SWR, or RTK Query. Never manually manage loading/error/data with three separate `useState` calls.
+```
+services/userService.ts   ← API calls only
+hooks/useUser.ts          ← wraps service + React Query
+components/UserCard.tsx   ← calls hook, renders state
+```
 
-Global client state (auth, theme, user preferences) uses a single solution per project — Zustand, Redux, or Context. Mixing multiple global state solutions in one project requires a documented decision in `DECISIONS.md`.
+Components call hooks. Hooks call services. Services call the network. Nothing skips a layer.
 
-State shape is typed strictly. No `any`, no optional chains masking missing types:
+Base URL, auth token injection, and default headers live in a single axios instance or fetch wrapper — not repeated per call.
+
+---
+
+## 3. State Management [MUST]
+
+Server state uses React Query, SWR, or RTK Query. Never manually manage loading/error/data with three separate `useState` calls.
+
+Global client state uses one solution per project. Mixing Zustand and Context and Redux in the same project requires a documented decision.
+
+---
+
+## 4. TypeScript Strictness [MUST]
+
+`strict: true` in `tsconfig.json`. Non-negotiable.
+
+`any` is forbidden. Use `unknown` and narrow it.
+
+`as` type assertions and non-null assertions (`!`) require an inline comment explaining why the type system cannot infer this:
 ```typescript
-// Forbidden
-const [data, setData] = useState<any>(null)
-
-// Correct
-const [user, setUser] = useState<User | null>(null)
-```
-
----
-
-## 3. API Layer
-
-Network calls are never made directly inside components. Ever.
-
-All API calls live in a dedicated service layer:
-```
-src/
-  services/
-    userService.ts     ← all user-related API calls
-    orderService.ts
-  hooks/
-    useUser.ts         ← wraps service + React Query
-```
-
-Components call hooks. Hooks call services. Services call the network.
-
-API responses are typed at the boundary — not inferred from usage. Define response types explicitly and validate them (zod or equivalent) if the API is external.
-
-Base URL, headers, and auth token injection are handled in a single axios instance or fetch wrapper. Not repeated per call.
-
----
-
-## 4. TypeScript Strictness
-
-`tsconfig.json` has `strict: true`. Non-negotiable.
-
-`any` is forbidden. If a type is genuinely unknown, use `unknown` and narrow it.
-
-`as` type assertions require a comment explaining why the type system cannot infer this correctly:
-```typescript
-// Forbidden
-const user = data as User
-
-// Acceptable only with explanation
-// API returns correct shape but tRPC types don't reflect optional fields yet
+// API returns correct shape but generated types don't reflect optional fields yet
 const user = data as User
 ```
 
-Non-null assertions (`!`) follow the same rule — comment or remove.
-
 ---
 
-## 5. File & Folder Conventions
+## 5. Testing [SHOULD]
 
-Feature folders contain everything related to that feature. No cross-feature imports except through `shared/` or `core/`.
+Component tests use React Testing Library. Test behavior, not implementation:
 
-```
-src/
-  features/
-    auth/
-    user/
-    order/
-  shared/
-    components/    ← generic UI primitives only
-    hooks/         ← generic hooks only
-    utils/
-  core/
-    api/
-    router/
-    theme/         ← see frontend rules
-```
-
-Barrel exports (`index.ts`) for each feature and shared folder. No deep imports from outside a feature:
 ```typescript
-// Correct
-import { UserCard } from '@/features/user'
+// Correct — tests what the user sees
+expect(screen.getByText('Welcome, Alice')).toBeInTheDocument()
 
-// Forbidden
-import { UserCard } from '@/features/user/components/UserCard/UserCard'
+// Forbidden — tests implementation detail
+expect(wrapper.find('UserGreeting').prop('name')).toBe('Alice')
 ```
+
+Hook logic is tested with `renderHook`. Service functions are unit tested independently with mocked fetch/axios.
+
+Do not test that a component calls a function — test what changes in the UI when it does.

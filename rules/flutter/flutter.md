@@ -1,97 +1,71 @@
 # Flutter / Dart Rules
 
-Extends `common/core.md` and `common/frontend.md`. These rules apply to every Flutter project.
+Extends `common/` rules and `common/frontend.md`.
 
 ---
 
-## 1. Widget Granularity
+## 1. Widget Granularity [MUST]
 
-Widgets are small and focused. If a widget has more than one visual responsibility, split it.
+`build()` methods over 60 lines are split. No business logic in `build()` — format data for display only.
 
-`build()` methods that exceed 60 lines are a signal to extract sub-widgets. Extract into:
-- Private widgets in the same file if used only once
-- Separate files in `shared/components/` if used in more than one feature
-
-Never put business logic in `build()`. If there is any logic beyond formatting data for display, it belongs in the state management layer.
+Private widgets in the same file if used once. Separate file in `shared/components/` if used in multiple features.
 
 ---
 
-## 2. State Management
+## 2. State Management [MUST]
 
-One state management solution per project. Riverpod is preferred. Bloc is acceptable for complex event-driven flows. Do not mix them.
+One solution per project. Riverpod is preferred. Bloc is acceptable for complex event-driven flows. Do not mix them.
 
-The choice is made at project start and logged in `DECISIONS.md`. It is not changed mid-project without a documented decision.
+The choice is made at project start and logged in `DECISIONS.md`.
 
-**Riverpod:** All providers are defined in dedicated provider files, not inline in widget files.
+`setState` is acceptable only for purely local UI state (animation controllers, focus nodes) — never for anything that touches a data source.
 
-**Bloc:** Every feature has its own Bloc. Blocs do not call other Blocs directly — communicate through the repository layer.
+**Riverpod:** All providers are in dedicated provider files, not inline in widget files.
 
-`setState` is acceptable only for purely local UI state (animation controllers, focus nodes). Not for anything that comes from or goes to a data source.
+**Bloc:** Blocs do not call other Blocs. Cross-feature communication goes through the repository layer.
 
 ---
 
-## 3. Theme & AppTheme
+## 3. AppTheme [MUST]
 
-`ThemeData` is defined once in `lib/theme/app_theme.dart`. No widget uses hardcoded colors, font sizes, or spacing values.
+`ThemeData` is defined once in `lib/theme/app_theme.dart`. No widget uses hardcoded colors, font sizes, or spacing.
+
+```
+lib/theme/
+  app_colors.dart
+  app_text_styles.dart
+  app_spacing.dart
+  app_theme.dart
+```
+
+Dark theme support is configured at project start.
+
+---
+
+## 4. Platform-Specific Code [MUST]
+
+`Platform.isIOS` and `Platform.isAndroid` are never scattered through UI or business logic. Platform-specific behavior is isolated:
+
+```
+core/platform/
+  share_service.dart           ← abstract interface
+  share_service_mobile.dart
+  share_service_web.dart
+```
+
+---
+
+## 5. Testing [SHOULD]
+
+Widget tests use `WidgetTester` — test what the user sees, not widget internals:
 
 ```dart
-lib/
-  theme/
-    app_colors.dart       ← color constants
-    app_text_styles.dart  ← TextStyle definitions
-    app_spacing.dart      ← spacing constants
-    app_theme.dart        ← ThemeData assembly
+await tester.pumpWidget(MyApp());
+expect(find.text('Welcome'), findsOneWidget);
 ```
 
-Colors are referenced via `Theme.of(context)` or the app colors constants — never as `Color(0xFF...)` inline.
+Riverpod tests use `ProviderContainer` with overridden providers — no mocking the entire dependency tree.
 
-`TextStyle` is never defined inline in a widget. It is always referenced from `app_text_styles.dart` or `Theme.of(context).textTheme`.
+Bloc tests use `bloc_test` package with `blocTest<MyBloc, MyState>()`. Every Bloc has a corresponding `*_bloc_test.dart`.
 
-Dark theme support is configured in `app_theme.dart` from project start.
-
----
-
-## 4. Platform-Specific Code Isolation
-
-Platform-specific code lives in dedicated files using conditional imports or the platform channel pattern. Never use `Platform.isIOS` or `Platform.isAndroid` scattered through UI code.
-
-```dart
-// Correct — isolated
-lib/
-  core/
-    platform/
-      share_service.dart          ← abstract interface
-      share_service_mobile.dart   ← mobile implementation
-      share_service_web.dart      ← web implementation
-```
-
-`dart:io` imports that are platform-specific are wrapped and injected, not used directly in widgets or business logic.
-
----
-
-## 5. Project Structure
-
-```
-lib/
-  core/
-    network/
-    storage/
-    platform/
-    theme/
-  features/
-    [feature]/
-      data/
-        [feature]_repository.dart
-        [feature]_remote_source.dart
-      domain/
-        [feature]_model.dart
-      presentation/
-        [feature]_page.dart
-        [feature]_provider.dart   ← or bloc/
-  shared/
-    components/
-    extensions/
-  main.dart
-```
-
-Each feature is self-contained. Cross-feature dependencies go through `core/` or `shared/`.
+Golden tests for critical UI components that must not change appearance unexpectedly.

@@ -1,29 +1,22 @@
 # .NET / C# Rules
 
-Extends `common/core.md`. These rules apply to every .NET project.
+Extends `common/` rules.
 
 ---
 
-## 1. Dependency Injection
+## 1. Dependency Injection [MUST]
 
-The built-in `Microsoft.Extensions.DependencyInjection` container is the default. No service locator pattern (`IServiceProvider` resolved manually inside classes). No static dependencies.
+Constructor injection only for mandatory dependencies. `[Autowired]` field injection is forbidden.
 
-Service lifetimes are explicit and correct:
-| Lifetime | Use for |
-|----------|---------|
-| `Singleton` | Stateless services, configuration, caches |
-| `Scoped` | Per-request services, DbContext, unit of work |
-| `Transient` | Lightweight, stateless utilities |
+Service lifetimes must be correct — captive dependency (Scoped injected into Singleton) is a runtime bug the compiler will not catch. Reason through lifetimes explicitly.
 
-Captive dependency (injecting Scoped into Singleton) is forbidden. The compiler will not catch this — you must reason about it.
-
-Interfaces are defined for all services that cross layer boundaries. Concrete types are only injected within the same layer.
+Interfaces are defined for all services crossing layer boundaries.
 
 ---
 
-## 2. Repository + Service Layer
+## 2. Layered Architecture [MUST]
 
-Architecture is layered. Dependencies point inward only:
+Dependencies point inward only:
 
 ```
 API / Presentation
@@ -32,67 +25,57 @@ Application (Services, Use Cases)
     ↓
 Domain (Entities, Interfaces)
     ↑
-Infrastructure (Repository implementations, DB, external APIs)
+Infrastructure (Repositories, DB, external APIs)
 ```
 
-`DbContext` is never used directly in controllers or application services. It is always wrapped in a repository.
+`DbContext` is never used directly in controllers or application services. Always wrapped in a repository.
 
-Repository interfaces are defined in the Domain layer. Implementations live in Infrastructure. Application services depend on the interface, never the implementation.
+Repository interfaces live in Domain. Implementations live in Infrastructure.
 
 ---
 
-## 3. Exception Handling
+## 3. Exception Handling [MUST]
 
-Global exception handling is configured at the application level (middleware or `UseExceptionHandler`). Controllers do not catch and swallow exceptions.
+Global exception middleware handles all unhandled exceptions. Controllers do not catch and swallow.
 
-Business rule violations are not exceptions — they are domain results:
-```csharp
-// Forbidden — business logic as exception
-throw new Exception("User not found");
-
-// Correct — explicit result
-public record Result<T>(T? Value, string? Error, bool IsSuccess);
-```
-
-Exceptions are for genuinely exceptional conditions: infrastructure failures, unexpected states. Not for control flow.
-
-`catch (Exception e)` without rethrowing or specific handling is forbidden unless at a global boundary.
-
----
-
-## 4. API Versioning
-
-All APIs are versioned from day one. Default strategy: URL segment (`/api/v1/`).
-
-```csharp
-builder.Services.AddApiVersioning(options => {
-    options.DefaultApiVersion = new ApiVersion(1, 0);
-    options.AssumeDefaultVersionWhenUnspecified = true;
-    options.ReportApiVersions = true;
-});
-```
-
-Breaking changes always increment the major version. A new version never removes the old one without a documented deprecation period.
-
----
-
-## 5. Async Conventions
-
-All I/O is async. No `.Result` or `.Wait()` on Tasks — this causes deadlocks in ASP.NET contexts.
-
+Business rule violations are domain results, not exceptions:
 ```csharp
 // Forbidden
-var user = userService.GetUserAsync(id).Result;
+throw new Exception("User not found");
 
 // Correct
-var user = await userService.GetUserAsync(id);
+return Result<User>.Failure("User not found");
 ```
 
-Method names that return `Task` end in `Async`. No exceptions.
+`catch (Exception)` without rethrowing requires a comment explaining why swallowing is intentional.
 
-`CancellationToken` is passed through the entire call chain from controller to repository for all I/O operations.
+---
 
+## 4. Async [MUST]
+
+No `.Result` or `.Wait()` on Tasks in ASP.NET contexts — causes deadlocks.
+
+`CancellationToken` is passed through the entire call chain for all I/O operations. Not optional.
+
+---
+
+## 5. API Versioning [SHOULD]
+
+All APIs are versioned from day one. URL segment versioning is the default (`/api/v1/`). Breaking changes increment the major version. Old versions are not removed without a documented deprecation period.
+
+---
+
+## 6. Testing [SHOULD]
+
+Unit tests do not load the ASP.NET host — they test classes directly with mocked dependencies (Moq or NSubstitute).
+
+Integration tests use `WebApplicationFactory<T>` with a real test database (use Testcontainers, not SQLite-in-memory — it masks SQL Server-specific behavior).
+
+Test method names describe behavior:
 ```csharp
 // Correct
-public async Task<User> GetUserAsync(string id, CancellationToken ct = default)
+void Should_ReturnNotFound_When_UserDoesNotExist()
+
+// Forbidden
+void TestGetUser()
 ```

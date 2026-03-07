@@ -1,12 +1,12 @@
 # Spring / Java Rules
 
-Extends `common/core.md`. These rules apply to every Spring Boot project.
+Extends `common/` rules.
 
 ---
 
-## 1. Dependency Injection
+## 1. Constructor Injection [MUST]
 
-Constructor injection is the only acceptable injection style for mandatory dependencies:
+Constructor injection is the only acceptable style for mandatory dependencies:
 
 ```java
 // Correct
@@ -24,83 +24,57 @@ public class UserService {
 private UserRepository userRepository;
 ```
 
-`@Autowired` field injection is forbidden. It makes dependencies invisible, prevents immutability, and breaks testability.
-
-`@Qualifier` use signals that an interface has too many implementations — reconsider the design before adding qualifiers.
+`@Autowired` field injection is forbidden — it hides dependencies, prevents immutability, and breaks testability.
 
 ---
 
-## 2. Repository + Service Layer
-
-Layers are strictly separated:
+## 2. Layered Architecture [MUST]
 
 ```
-Controller        ← HTTP only, no business logic
+Controller     ← HTTP only, no business logic
     ↓
-Service           ← business logic, orchestration
+Service        ← business logic, orchestration
     ↓
-Repository        ← data access only
+Repository     ← data access only
     ↓
-Entity / Model    ← JPA entities or plain domain objects
+Entity         ← JPA entities
 ```
 
-Controllers do not call repositories. Services do not contain SQL or JPQL directly — that lives in repositories.
+Controllers never call repositories. Services never contain JPQL directly.
 
-DTOs are used at the controller boundary. JPA entities are never serialized directly to API responses. MapStruct or manual mapping is acceptable — document the choice in `DECISIONS.md`.
+DTOs at the controller boundary — JPA entities are never serialized to API responses directly.
 
 ---
 
-## 3. Exception Handling
+## 3. Exception Handling [MUST]
 
-A global `@ControllerAdvice` / `@RestControllerAdvice` handles all exceptions. Individual controllers do not have try/catch blocks for business exceptions.
+`@RestControllerAdvice` handles all exceptions globally. Controllers do not have try/catch for business exceptions.
 
-Custom exceptions extend `RuntimeException` for unchecked, or `Exception` for checked (prefer unchecked in Spring applications):
-
-```java
-public class UserNotFoundException extends RuntimeException {
-    public UserNotFoundException(String id) {
-        super("User not found: " + id);
-    }
-}
-```
-
-Checked exceptions from libraries (IOException, SQLException) are caught at the infrastructure layer and rethrown as domain exceptions. They do not bubble up to the service layer as checked exceptions.
+Checked exceptions from libraries are caught at the infrastructure layer and rethrown as unchecked domain exceptions. They do not bubble to the service layer as checked exceptions.
 
 ---
 
-## 4. API Versioning
+## 4. Transactions [MUST]
 
-All REST APIs are versioned from day one. URL segment versioning is the default:
-```
-/api/v1/users
-/api/v2/users
-```
+`@Transactional` is applied at the service layer. Read-only operations use `@Transactional(readOnly = true)` — not optional, it enables query optimizations.
 
-`@RequestMapping` at the controller level includes the version prefix. Versioning is not added per-method.
-
-Breaking changes always introduce a new version. Old versions remain available until formally deprecated and communicated.
+`@Transactional` on `private` methods has no effect due to Spring's proxy-based AOP. If you need transactional behavior in a private method, restructure.
 
 ---
 
-## 5. Transaction Management
+## 5. API Versioning [SHOULD]
 
-`@Transactional` is applied at the service layer, not the repository layer or controller.
-
-Read-only operations are annotated with `@Transactional(readOnly = true)` — this is not optional, it enables query optimizations.
-
-Transactions do not span HTTP requests. If a workflow requires multiple requests to complete, use a saga pattern or explicit compensation logic — not a held transaction.
-
-`@Transactional` on `private` methods has no effect — Spring's proxy-based AOP cannot intercept them. If you need transactional behavior on a private method, restructure.
+All APIs versioned from day one with URL segments (`/api/v1/`). Breaking changes introduce a new version — old versions remain available until formally deprecated.
 
 ---
 
-## 6. Testing Conventions
+## 6. Testing [SHOULD]
 
-Unit tests use Mockito. No Spring context is loaded for unit tests — they are fast.
+Unit tests do not load the Spring context. They test classes directly with Mockito mocks — fast, no infrastructure.
 
-Integration tests use `@SpringBootTest` with `@Testcontainers` for real infrastructure (DB, Redis, etc.). No H2 in-memory database for integration tests — it masks SQL compatibility issues.
+Integration tests use `@SpringBootTest` with `@Testcontainers` for real infrastructure. No H2 in-memory database — it masks SQL compatibility issues with production databases.
 
-Test method names describe behavior, not implementation:
+Test method names describe behavior:
 ```java
 // Correct
 @Test
@@ -110,3 +84,5 @@ void shouldReturnNotFoundWhenUserDoesNotExist()
 @Test
 void testGetUser()
 ```
+
+Every Repository has an integration test that verifies queries against a real database (Testcontainers).
