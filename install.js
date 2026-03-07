@@ -5,8 +5,8 @@
 // Usage:
 //   node install.js                       # interactive — pick languages, install rules globally
 //   node install.js go swift              # non-interactive — install rules globally
-//   node install.js --templates           # project templates only (no rules)
-//   node install.js --templates go swift  # install rules globally + project templates
+//   node install.js --templates           # interactive — templates only (asks languages + UI for CLAUDE.md)
+//   node install.js --templates go swift  # non-interactive — templates only (asks UI for CLAUDE.md)
 
 const fs = require("fs");
 const path = require("path");
@@ -60,73 +60,75 @@ if (args[0] === "--templates") {
 const homeDir = process.env.HOME || process.env.USERPROFILE;
 const globalDest = process.env.CLAUDE_RULES_DIR || path.join(homeDir, ".claude", "rules");
 
-// --templates without language args = templates only, no rules
-const installRules = !withTemplates || args.length > 0;
+// --templates = templates only, no rules installation
+const installRules = !withTemplates;
 
 async function main() {
   let selectedLangs = [];
   let hasUI = false;
 
-  // --- Language selection (only when installing rules) ---
-  if (installRules) {
-    if (args.length > 0) {
-      // Non-interactive: validate args
-      for (const lang of args) {
-        if (!/^[a-zA-Z0-9_-]+$/.test(lang)) {
-          console.error(`${c.red}Error: invalid language name '${lang}'${c.reset}`);
-          process.exit(1);
-        }
-        if (!availableLangs.includes(lang)) {
-          console.error(`${c.red}Error: no rules found for '${lang}'${c.reset}`);
-          console.error(`Available: ${availableLangs.join(", ")}`);
-          process.exit(1);
-        }
-        selectedLangs.push(lang);
+  // --- Language selection (always needed — for rules install or CLAUDE.md config) ---
+  if (args.length > 0) {
+    // Non-interactive: validate args
+    for (const lang of args) {
+      if (!/^[a-zA-Z0-9_-]+$/.test(lang)) {
+        console.error(`${c.red}Error: invalid language name '${lang}'${c.reset}`);
+        process.exit(1);
       }
-    } else {
-      // Interactive: ask for languages
-      const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+      if (!availableLangs.includes(lang)) {
+        console.error(`${c.red}Error: no rules found for '${lang}'${c.reset}`);
+        console.error(`Available: ${availableLangs.join(", ")}`);
+        process.exit(1);
+      }
+      selectedLangs.push(lang);
+    }
+  } else {
+    // Interactive: ask for languages
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
-      console.log();
-      console.log(`${c.bold}claude-ground installer${c.reset}`);
-      console.log(line);
+    console.log();
+    console.log(`${c.bold}claude-ground${withTemplates ? " — project setup" : " installer"}${c.reset}`);
+    console.log(line);
+    if (!withTemplates) {
       console.log(`Target: ${c.cyan}global${c.reset} → ${globalDest}`);
       console.log("Active across all projects.");
-      console.log();
-      console.log(`${c.bold}Which languages do you want rules for?${c.reset}`);
-      console.log(`${c.yellow}common/ rules are always installed.${c.reset}`);
-      console.log();
-      console.log("Space-separated (e.g: go swift typescript) — or: all");
-      console.log();
-      console.log("Available languages:");
-      for (const lang of availableLangs) console.log(`  • ${lang}`);
-      console.log();
+    } else {
+      console.log(`Setting up templates in: ${c.cyan}${process.cwd()}${c.reset}`);
+    }
+    console.log();
+    console.log(`${c.bold}Which languages do you use?${c.reset}`);
+    if (!withTemplates) console.log(`${c.yellow}common/ rules are always installed.${c.reset}`);
+    console.log();
+    console.log("Space-separated (e.g: go swift typescript) — or: all");
+    console.log();
+    console.log("Available languages:");
+    for (const lang of availableLangs) console.log(`  • ${lang}`);
+    console.log();
 
-      const langInput = await ask(rl, "Selection: ");
+    const langInput = await ask(rl, "Selection: ");
 
-      if (langInput.trim() === "all") {
-        selectedLangs = [...availableLangs];
-      } else {
-        selectedLangs = langInput.trim().split(/\s+/).filter(Boolean);
-        for (const lang of selectedLangs) {
-          if (!availableLangs.includes(lang)) {
-            console.error(`${c.red}Error: '${lang}' not found. Available: ${availableLangs.join(", ")}${c.reset}`);
-            rl.close();
-            process.exit(1);
-          }
+    if (langInput.trim() === "all") {
+      selectedLangs = [...availableLangs];
+    } else {
+      selectedLangs = langInput.trim().split(/\s+/).filter(Boolean);
+      for (const lang of selectedLangs) {
+        if (!availableLangs.includes(lang)) {
+          console.error(`${c.red}Error: '${lang}' not found. Available: ${availableLangs.join(", ")}${c.reset}`);
+          rl.close();
+          process.exit(1);
         }
       }
-
-      if (!withTemplates) {
-        const tmplAns = await ask(rl, "\nSet up project templates too? (CLAUDE.md, DECISIONS.md, phases/) [y/N]: ");
-        withTemplates = /^y/i.test(tmplAns.trim());
-      }
-
-      rl.close();
     }
+
+    if (!withTemplates) {
+      const tmplAns = await ask(rl, "\nSet up project templates too? (CLAUDE.md, DECISIONS.md, phases/) [y/N]: ");
+      withTemplates = /^y/i.test(tmplAns.trim());
+    }
+
+    rl.close();
   }
 
-  // --- Install rules ---
+  // --- Install rules (only without --templates) ---
   if (installRules) {
     console.log();
     console.log(`${c.bold}Installing rules...${c.reset}`);
@@ -182,13 +184,17 @@ async function main() {
       for (const ref of refs) console.log(`      ${c.cyan}${ref}${c.reset}`);
       console.log();
     } else {
-      // Copy template and optionally uncomment frontend line
+      // Copy template, uncomment selected languages and optionally frontend
       let claudeMd = fs.readFileSync(path.join(TEMPLATES_DIR, "CLAUDE.md"), "utf8");
       if (hasUI) {
         claudeMd = claudeMd.replace("<!-- @rules/common/frontend.md -->", "@rules/common/frontend.md");
       }
+      for (const lang of selectedLangs) {
+        claudeMd = claudeMd.replace(`<!-- @rules/${lang}/${lang}.md -->`, `@rules/${lang}/${lang}.md`);
+      }
       fs.writeFileSync(claudeMdDest, claudeMd);
-      console.log(`${ok} CLAUDE.md → project root${hasUI ? " (frontend rules enabled)" : ""}`);
+      console.log(`${ok} CLAUDE.md → project root${hasUI ? " (frontend enabled)" : ""}`);
+      if (selectedLangs.length > 0) console.log(`${ok} Language rules uncommented: ${selectedLangs.join(", ")}`);
     }
 
     if (exists(decisionsDest)) {
