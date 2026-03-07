@@ -83,12 +83,14 @@ No dependencies. Uses only Node.js built-ins — no `npm install` needed.
 
 ### Step 2 — Set up a project (per project)
 
+From your project directory:
+
 ```bash
 cd your-project
 node /path/to/claude-ground/install.js --templates
 ```
 
-This creates project files in your current directory:
+This asks if the project has a UI (to enable frontend rules), then creates:
 
 ```
 your-project/
@@ -99,14 +101,11 @@ your-project/
         └── PHASE-01-active.md       ← define your first phase
 ```
 
-You can combine both steps if starting fresh:
+`--templates` alone does **not** reinstall rules — it only creates project files. To combine both (e.g. fresh machine):
 
 ```bash
-cd your-project
 node /path/to/claude-ground/install.js --templates go swift
 ```
-
-This installs go + swift rules globally AND creates templates in the current directory.
 
 ### Step 3 — Fill in CLAUDE.md
 
