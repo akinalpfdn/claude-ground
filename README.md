@@ -73,7 +73,7 @@ Rules are always global. Templates are always local to whatever directory you ru
 ```bash
 git clone https://github.com/akinalpfdn/claude-ground
 cd claude-ground
-node install.js                    # interactive — pick languages, UI yes/no
+node install.js                    # interactive — pick languages
 node install.js go typescript      # non-interactive — specify languages directly
 ```
 

@@ -3,10 +3,10 @@
 // Works on macOS, Linux, and Windows.
 //
 // Usage:
-//   node install.js                       # interactive mode (global rules)
-//   node install.js go swift              # specify languages directly
-//   node install.js --templates           # project templates only (no rules)
-//   node install.js --templates go swift  # global rules + project templates
+//   node install.js                       # interactive — pick languages
+//   node install.js go swift              # non-interactive — specify languages
+//   node install.js --templates           # interactive + project templates
+//   node install.js --templates go swift  # non-interactive + project templates
 
 const fs = require("fs");
 const path = require("path");
@@ -62,7 +62,6 @@ const globalDest = process.env.CLAUDE_RULES_DIR || path.join(homeDir, ".claude",
 
 async function main() {
   let selectedLangs = [];
-  let hasUI = false;
 
   // --- Rules ---
   if (args.length > 0) {
@@ -111,9 +110,6 @@ async function main() {
       }
     }
 
-    const uiAns = await ask(rl, "\nDoes this project have a UI? (adds frontend rules) [y/N]: ");
-    hasUI = /^y/i.test(uiAns.trim());
-
     if (!withTemplates) {
       const tmplAns = await ask(rl, "Set up project templates too? (CLAUDE.md, DECISIONS.md, phases/) [y/N]: ");
       withTemplates = /^y/i.test(tmplAns.trim());
@@ -132,16 +128,7 @@ async function main() {
   }
 
   copyDir(path.join(RULES_DIR, "common"), path.join(globalDest, "common"));
-  console.log(`${ok} common → ${globalDest}/common/`);
-
-  // frontend.md only for UI projects
-  const frontendDest = path.join(globalDest, "common", "frontend.md");
-  if (hasUI) {
-    console.log(`${ok} frontend rules included (common/frontend.md)`);
-  } else {
-    if (exists(frontendDest)) fs.unlinkSync(frontendDest);
-    console.log(`  — frontend rules skipped (backend-only project)`);
-  }
+  console.log(`${ok} common → ${globalDest}/common/ (includes frontend.md)`);
 
   for (const lang of selectedLangs) {
     const langDir = path.join(RULES_DIR, lang);
@@ -172,7 +159,6 @@ async function main() {
         "@rules/common/debug.md",
         "@rules/common/existing-code.md",
       ];
-      if (hasUI) refs.push("@rules/common/frontend.md");
       for (const lang of selectedLangs) refs.push(`@rules/${lang}/${lang}.md`);
 
       console.log(`${warn} CLAUDE.md already exists. Add these lines to activate claude-ground:`);
