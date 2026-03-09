@@ -38,6 +38,7 @@ See `.claude/phases/` — always check the active phase file before starting wor
 <!-- @rules/flutter/flutter.md -->
 <!-- @rules/rust/rust.md -->
 <!-- @rules/dotnet/dotnet.md -->
+<!-- @rules/python/python.md -->
 <!-- @rules/spring/spring.md -->
 
 ## Project-Specific Constraints

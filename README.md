@@ -44,6 +44,7 @@ These aren't model failures — they're defaults that go unchallenged without ex
 | Kotlin | Coroutine scopes, sealed UI state, Compose theming, repository pattern, coroutine testing |
 | Flutter | Widget granularity, state management, AppTheme, platform isolation, widget/golden tests |
 | Rust | Ownership patterns, thiserror/anyhow, tokio consistency, unsafe discipline, proptest |
+| Python | Type hints, project structure, custom exceptions, dependency management, pytest |
 | .NET | Constructor DI, layered architecture, async + CancellationToken, Result pattern, Testcontainers |
 | Spring | Constructor injection, layered architecture, exception handling, transactions, Testcontainers |
 
@@ -161,6 +162,8 @@ claude-ground/
 │   │   └── flutter.md
 │   ├── rust/
 │   │   └── rust.md
+│   ├── python/
+│   │   └── python.md
 │   ├── dotnet/
 │   │   └── dotnet.md
 │   └── spring/
