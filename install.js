@@ -51,11 +51,10 @@ const availableLangs = fs
   .map((d) => d.name);
 
 let withTemplates = false;
-let args = process.argv.slice(2);
-if (args[0] === "--templates") {
-  withTemplates = true;
-  args = args.slice(1);
-}
+let args = process.argv.slice(2).filter((a) => {
+  if (a === "--templates") { withTemplates = true; return false; }
+  return true;
+});
 
 const homeDir = process.env.HOME || process.env.USERPROFILE;
 const globalDest = process.env.CLAUDE_RULES_DIR || path.join(homeDir, ".claude", "rules");
