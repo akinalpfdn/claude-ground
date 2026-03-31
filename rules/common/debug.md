@@ -13,6 +13,11 @@ Applies to every project. The most common failure mode when debugging is not hav
 
 This rule exists because brute-force debugging creates new bugs, masks the original problem, and wastes context window.
 
+**Escalation to core.md Rule 3:**
+If this rule is triggered (2 failed attempts), it AUTOMATICALLY triggers User Approval Gates (core.md §3). Present options to the user. Do NOT propose a third approach without explicit user selection.
+
+**Self-check:** Before each attempt, state: "This is attempt N of 2." If N > 2 and user has not approved, STOP.
+
 ---
 
 ## 2. Structured Analysis Before Attempt 3 [MUST]
