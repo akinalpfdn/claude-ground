@@ -1,6 +1,6 @@
 {
   "name": "claude-ground",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Opinionated rules, skills & project templates for Claude Code",
   "bin": {
     "claudeground": "./cli.js"
