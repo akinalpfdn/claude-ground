@@ -1,6 +1,6 @@
 # claude-ground
 
-A minimal rule system for Claude Code. Gives Claude the structural discipline it lacks by default — phase tracking, decision logging, honest pushback, debug discipline, and language-specific best practices.
+A minimal rule system for Claude Code. Gives Claude the structural discipline it lacks by default — phase tracking, decision logging, honest pushback, debug discipline, language-specific best practices, and reusable skills.
 
 ---
 
@@ -48,6 +48,12 @@ These aren't model failures — they're defaults that go unchallenged without ex
 | .NET | Constructor DI, layered architecture, async + CancellationToken, Result pattern, Testcontainers |
 | Spring | Constructor injection, layered architecture, exception handling, transactions, Testcontainers |
 
+**`commands/`** — Reusable skills (slash commands):
+
+| Skill | What it does |
+|-------|-------------|
+| `mac-release` | Build, sign, notarize, and publish a macOS app as a GitHub release with a professional DMG |
+
 All rules use **MUST / SHOULD / RECOMMENDED** severity levels so Claude knows what is a hard rule vs a best practice.
 
 **`templates/`** — Starting point for new projects:
@@ -60,27 +66,30 @@ All rules use **MUST / SHOULD / RECOMMENDED** severity levels so Claude knows wh
 
 ## Install
 
-Two things get installed — they go to different places:
+Three things get installed — they go to different places:
 
 | What | Where | Effect |
 |------|-------|--------|
 | **Rules** | `~/.claude/rules/` (global) | Active in every project, every session |
+| **Skills** | `~/.claude/commands/` (global) | Slash commands available everywhere |
 | **Templates** | Current working directory | CLAUDE.md, DECISIONS.md, phases/ for one project |
 
-Rules are always global. Templates are always local to whatever directory you run the command from.
-
-### Step 1 — Install rules (once)
+Rules and skills are always global. Templates are always local to whatever directory you run the command from.
 
 ```bash
-git clone https://github.com/akinalpfdn/claude-ground
-cd claude-ground
-node install.js                    # interactive — pick languages
-node install.js go typescript      # non-interactive — specify languages directly
+npm install -g claude-ground
 ```
 
-This installs common rules + your chosen language rules to `~/.claude/rules/`. Done once, works everywhere.
+No dependencies — uses only Node.js built-ins.
 
-No dependencies. Uses only Node.js built-ins — no `npm install` needed.
+### Step 1 — Install rules + skills globally (once)
+
+```bash
+claudeground                       # interactive — pick languages + skills
+claudeground install go typescript # non-interactive — specify languages directly
+```
+
+This installs common rules + your chosen language rules to `~/.claude/rules/`, and selected skills to `~/.claude/commands/`. Done once, works everywhere.
 
 ### Step 2 — Set up a project (per project)
 
@@ -88,7 +97,8 @@ From your project directory:
 
 ```bash
 cd your-project
-node /path/to/claude-ground/install.js --templates
+claudeground init                  # interactive — pick languages, skills, UI
+claudeground init go swift         # non-interactive — specific languages
 ```
 
 This asks if the project has a UI (to enable frontend rules), then creates:
@@ -98,14 +108,10 @@ your-project/
 ├── CLAUDE.md                        ← fill this in
 ├── DECISIONS.md                     ← log your first stack decision
 └── .claude/
+    ├── commands/                    ← project-level skills (if selected)
+    │   └── mac-release.md
     └── phases/
         └── PHASE-01-active.md       ← define your first phase
-```
-
-`--templates` alone does **not** reinstall rules — it only creates project files. To combine both (e.g. fresh machine):
-
-```bash
-node /path/to/claude-ground/install.js --templates go swift
 ```
 
 ### Step 3 — Fill in CLAUDE.md
@@ -115,6 +121,16 @@ Open `CLAUDE.md` and fill in:
 - Your tech stack and why
 - Uncomment the language rules that apply
 - Any project-specific constraints for Claude
+
+### Updating
+
+When you update the package (`npm update -g claude-ground`), re-apply your rules and skills:
+
+```bash
+claudeground update                # re-installs using your saved preferences
+```
+
+Your language and skill selections are saved to `~/.claude/.claude-ground.json` on first install — no need to re-select every time.
 
 ---
 
@@ -140,7 +156,8 @@ Claude checks the active phase file before continuing work. It will not start th
 
 ```
 claude-ground/
-├── install.js
+├── cli.js
+├── package.json
 ├── rules/
 │   ├── common/
 │   │   ├── core.md            # phase management, approval gates, honest pushback
@@ -168,6 +185,8 @@ claude-ground/
 │   │   └── dotnet.md
 │   └── spring/
 │       └── spring.md
+├── commands/
+│   └── mac-release.md         # macOS app release pipeline
 └── templates/
     ├── CLAUDE.md
     ├── DECISIONS.md
@@ -185,4 +204,9 @@ Rules should be:
 - Free of code snippets that Claude would write anyway
 - Tagged with severity: **MUST** (hard rule), **SHOULD** (best practice), **RECOMMENDED** (nice to have)
 
-New language rules, corrections, and improvements are welcome.
+Skills should be:
+- Generic — no hardcoded user-specific values, use placeholders
+- Self-contained — one `.md` file per skill in `commands/`
+- Production-focused — real workflows, not demos
+
+New language rules, skills, corrections, and improvements are welcome.

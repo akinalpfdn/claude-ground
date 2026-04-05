@@ -1,0 +1,30 @@
+{
+  "name": "claude-ground",
+  "version": "0.3.0",
+  "description": "Opinionated rules, skills & project templates for Claude Code",
+  "bin": {
+    "claudeground": "./cli.js"
+  },
+  "files": [
+    "cli.js",
+    "rules/**/*",
+    "commands/**/*",
+    "templates/**/*"
+  ],
+  "keywords": [
+    "claude",
+    "claude-code",
+    "ai",
+    "rules",
+    "templates",
+    "developer-tools"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/akinalpfidan/claude-ground"
+  },
+  "engines": {
+    "node": ">=16"
+  }
+}
