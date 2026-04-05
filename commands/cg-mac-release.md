@@ -1,5 +1,5 @@
 ---
-name: mac-release
+name: cg-mac-release
 description: "Build, sign, notarize, and publish a macOS app as a GitHub release with a professional DMG"
 category: utility
 complexity: intermediate
@@ -7,7 +7,7 @@ mcp-servers: []
 personas: []
 ---
 
-# /mac-release - macOS App Release
+# /cg-mac-release - macOS App Release
 
 Builds a signed, notarized macOS `.app`, packages it in a drag-to-install DMG, and publishes it as a GitHub release.
 

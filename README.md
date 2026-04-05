@@ -52,7 +52,7 @@ These aren't model failures — they're defaults that go unchallenged without ex
 
 | Skill | What it does |
 |-------|-------------|
-| `mac-release` | Build, sign, notarize, and publish a macOS app as a GitHub release with a professional DMG |
+| `cg-mac-release` | Build, sign, notarize, and publish a macOS app as a GitHub release with a professional DMG |
 
 All rules use **MUST / SHOULD / RECOMMENDED** severity levels so Claude knows what is a hard rule vs a best practice.
 
@@ -109,7 +109,7 @@ your-project/
 ├── DECISIONS.md                     ← log your first stack decision
 └── .claude/
     ├── commands/                    ← project-level skills (if selected)
-    │   └── mac-release.md
+    │   └── cg-mac-release.md
     └── phases/
         └── PHASE-01-active.md       ← define your first phase
 ```
@@ -186,7 +186,7 @@ claude-ground/
 │   └── spring/
 │       └── spring.md
 ├── commands/
-│   └── mac-release.md         # macOS app release pipeline
+│   └── cg-mac-release.md         # macOS app release pipeline
 └── templates/
     ├── CLAUDE.md
     ├── DECISIONS.md
