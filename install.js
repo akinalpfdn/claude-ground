@@ -3,9 +3,9 @@
 // Works on macOS, Linux, and Windows.
 //
 // Usage:
-//   node install.js                       # interactive — pick languages, install rules globally
-//   node install.js go swift              # non-interactive — install rules globally
-//   node install.js --templates           # interactive — templates only (asks languages + UI for CLAUDE.md)
+//   node install.js                       # interactive — pick languages + skills, install globally
+//   node install.js go swift              # non-interactive — install rules globally (no skill selection)
+//   node install.js --templates           # interactive — templates + skills (asks languages + UI)
 //   node install.js --templates go swift  # non-interactive — templates only (asks UI for CLAUDE.md)
 
 const fs = require("fs");
@@ -14,6 +14,7 @@ const readline = require("readline");
 
 const SCRIPT_DIR = __dirname;
 const RULES_DIR = process.env.CLAUDE_GROUND_RULES_DIR || path.join(SCRIPT_DIR, "rules");
+const COMMANDS_DIR = process.env.CLAUDE_GROUND_COMMANDS_DIR || path.join(SCRIPT_DIR, "commands");
 const TEMPLATES_DIR = process.env.CLAUDE_GROUND_TEMPLATES_DIR || path.join(SCRIPT_DIR, "templates");
 
 const supportsColor = process.platform !== "win32" || process.env.TERM;
@@ -50,6 +51,11 @@ const availableLangs = fs
   .filter((d) => d.isDirectory() && d.name !== "common")
   .map((d) => d.name);
 
+const availableSkills = fs
+  .readdirSync(COMMANDS_DIR, { withFileTypes: true })
+  .filter((f) => f.isFile() && f.name.endsWith(".md"))
+  .map((f) => f.name.replace(/\.md$/, ""));
+
 let withTemplates = false;
 let args = process.argv.slice(2).filter((a) => {
   if (a === "--templates") { withTemplates = true; return false; }
@@ -64,6 +70,7 @@ const installRules = !withTemplates;
 
 async function main() {
   let selectedLangs = [];
+  let selectedSkills = [];
   let hasUI = false;
 
   // --- Language selection (always needed — for rules install or CLAUDE.md config) ---
@@ -98,7 +105,7 @@ async function main() {
     console.log(`${c.bold}Which languages do you use?${c.reset}`);
     if (!withTemplates) console.log(`${c.yellow}common/ rules are always installed.${c.reset}`);
     console.log();
-    console.log("Space-separated (e.g: go swift typescript) — or: all");
+    console.log("Space-separated (e.g: go swift typescript) — or: all / none");
     console.log();
     console.log("Available languages:");
     for (const lang of availableLangs) console.log(`  • ${lang}`);
@@ -108,13 +115,40 @@ async function main() {
 
     if (langInput.trim() === "all") {
       selectedLangs = [...availableLangs];
-    } else {
+    } else if (langInput.trim() !== "none" && langInput.trim() !== "") {
       selectedLangs = langInput.trim().split(/\s+/).filter(Boolean);
       for (const lang of selectedLangs) {
         if (!availableLangs.includes(lang)) {
           console.error(`${c.red}Error: '${lang}' not found. Available: ${availableLangs.join(", ")}${c.reset}`);
           rl.close();
           process.exit(1);
+        }
+      }
+    }
+
+    // Skill selection
+    if (availableSkills.length > 0) {
+      console.log();
+      console.log(`${c.bold}Which skills (slash commands) do you want?${c.reset}`);
+      console.log();
+      console.log("Space-separated (e.g: mac-release) — or: all / none");
+      console.log();
+      console.log("Available skills:");
+      for (const skill of availableSkills) console.log(`  • ${skill}`);
+      console.log();
+
+      const skillInput = await ask(rl, "Selection: ");
+
+      if (skillInput.trim() === "all") {
+        selectedSkills = [...availableSkills];
+      } else if (skillInput.trim() !== "none" && skillInput.trim() !== "") {
+        selectedSkills = skillInput.trim().split(/\s+/).filter(Boolean);
+        for (const skill of selectedSkills) {
+          if (!availableSkills.includes(skill)) {
+            console.error(`${c.red}Error: '${skill}' not found. Available: ${availableSkills.join(", ")}${c.reset}`);
+            rl.close();
+            process.exit(1);
+          }
         }
       }
     }
@@ -145,6 +179,18 @@ async function main() {
       if (!exists(langDir)) { console.log(`${fail} No rules for '${lang}', skipping.`); continue; }
       copyDir(langDir, path.join(globalDest, lang));
       console.log(`${ok} ${lang} → ${globalDest}/${lang}/`);
+    }
+
+    // Install skills globally
+    if (selectedSkills.length > 0) {
+      const globalCmds = path.join(homeDir, ".claude", "commands");
+      fs.mkdirSync(globalCmds, { recursive: true });
+      for (const skill of selectedSkills) {
+        const src = path.join(COMMANDS_DIR, `${skill}.md`);
+        if (!exists(src)) { console.log(`${fail} No skill '${skill}', skipping.`); continue; }
+        fs.copyFileSync(src, path.join(globalCmds, `${skill}.md`));
+        console.log(`${ok} /${skill} → ${globalCmds}/${skill}.md`);
+      }
     }
   }
 
@@ -213,6 +259,18 @@ async function main() {
       );
       console.log(`${ok} .claude/phases/PHASE-01-active.md → project`);
     }
+
+    // Install skills locally
+    if (selectedSkills.length > 0) {
+      const localCmds = path.join(claudeDir, "commands");
+      fs.mkdirSync(localCmds, { recursive: true });
+      for (const skill of selectedSkills) {
+        const src = path.join(COMMANDS_DIR, `${skill}.md`);
+        if (!exists(src)) { console.log(`${fail} No skill '${skill}', skipping.`); continue; }
+        fs.copyFileSync(src, path.join(localCmds, `${skill}.md`));
+        console.log(`${ok} /${skill} → .claude/commands/${skill}.md`);
+      }
+    }
   }
 
   // --- Summary ---
@@ -223,6 +281,7 @@ async function main() {
   if (installRules) {
     console.log(`Rules installed to: ${c.cyan}${globalDest}${c.reset}`);
     if (selectedLangs.length > 0) console.log(`Languages: ${c.cyan}${selectedLangs.join(", ")}${c.reset}`);
+    if (selectedSkills.length > 0) console.log(`Skills: ${c.cyan}${selectedSkills.map((s) => "/" + s).join(", ")}${c.reset}`);
   }
   console.log();
   console.log("Next steps:");
