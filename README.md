@@ -33,6 +33,10 @@ These aren't model failures — they're defaults that go unchallenged without ex
 | `debug.md` | Two-attempt rule, structured analysis, no error masking |
 | `existing-code.md` | Read before touch, follow existing patterns, separate refactoring from features |
 | `frontend.md` | Theme-first, no inline styles, intentional design (UI projects only) |
+| `security.md` | Input validation, auth, secrets, headers, rate limiting essentials (production) |
+| `deploy.md` | Server hardening, TLS, systemd, monitoring essentials (production) |
+| `observability.md` | Structured logging, health checks, external monitoring essentials (production) |
+| `oss-hygiene.md` | Branch protection, tag immutability, signing, governance (open source) |
 
 **`rules/[language]/`** — Language-specific best practices:
 
@@ -53,6 +57,12 @@ These aren't model failures — they're defaults that go unchallenged without ex
 | Skill | What it does |
 |-------|-------------|
 | `cg-mac-release` | Build, sign, notarize, and publish a macOS app as a GitHub release with a professional DMG |
+| `cg-devplan` | Generate structured development plans for Claude Code to follow |
+| `cg-store-listing` | Generate ASO-optimized App Store / Google Play listing metadata |
+| `cg-security-hardening` | Full security hardening guide — OWASP-aligned, multi-language, with validation tests |
+| `cg-indie-deploy` | Deploy to a single VPS — Caddy/nginx, systemd, TLS, backups, rollback |
+| `cg-indie-observability` | Structured logging, error tracking, uptime monitoring, alerting |
+| `cg-oss-git-hygiene` | OSS repo setup — rulesets, signing, templates, Dependabot, triage |
 
 All rules use **MUST / SHOULD / RECOMMENDED** severity levels so Claude knows what is a hard rule vs a best practice.
 
@@ -166,7 +176,11 @@ claude-ground/
 │   │   ├── testing.md         # test discipline, naming, coverage
 │   │   ├── debug.md           # two-attempt rule, structured analysis
 │   │   ├── existing-code.md   # read before touch, pattern respect
-│   │   └── frontend.md        # theme-first, intentional design (UI only)
+│   │   ├── frontend.md        # theme-first, intentional design (UI only)
+│   │   ├── security.md        # security essentials → refs full guide
+│   │   ├── deploy.md          # deploy essentials → refs full guide
+│   │   ├── observability.md   # observability essentials → refs full guide
+│   │   └── oss-hygiene.md     # OSS repo essentials → refs full guide
 │   ├── go/
 │   │   └── go.md
 │   ├── swift/
@@ -186,7 +200,13 @@ claude-ground/
 │   └── spring/
 │       └── spring.md
 ├── commands/
-│   └── cg-mac-release.md         # macOS app release pipeline
+│   ├── cg-mac-release.md         # macOS app release pipeline
+│   ├── cg-devplan.md             # development plan generator
+│   ├── cg-store-listing.md       # app store listing generator
+│   ├── cg-security-hardening.md  # full security hardening guide
+│   ├── cg-indie-deploy.md        # VPS deployment guide
+│   ├── cg-indie-observability.md # production observability guide
+│   └── cg-oss-git-hygiene.md     # OSS repository setup guide
 └── templates/
     ├── CLAUDE.md
     ├── DECISIONS.md

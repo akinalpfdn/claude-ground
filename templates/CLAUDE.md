@@ -27,6 +27,12 @@ See `.claude/phases/` — always check the active phase file before starting wor
 @rules/common/debug.md
 @rules/common/existing-code.md
 
+### Production readiness (uncomment what applies)
+<!-- @rules/common/security.md -->
+<!-- @rules/common/deploy.md -->
+<!-- @rules/common/observability.md -->
+<!-- @rules/common/oss-hygiene.md -->
+
 ### UI projects only (remove if backend-only)
 <!-- @rules/common/frontend.md -->
 
