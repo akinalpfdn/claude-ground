@@ -2,3 +2,4 @@
 Thumbs.db
 *.log
 .docs/
+node_modules/

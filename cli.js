@@ -12,19 +12,26 @@
 
 const fs = require("fs");
 const path = require("path");
-const readline = require("readline");
+const { checkbox, confirm } = require("@inquirer/prompts");
 
+// ─── Paths ───────────────────────────────────────────────
 const SCRIPT_DIR = __dirname;
 const RULES_DIR = process.env.CLAUDE_GROUND_RULES_DIR || path.join(SCRIPT_DIR, "rules");
 const COMMANDS_DIR = process.env.CLAUDE_GROUND_COMMANDS_DIR || path.join(SCRIPT_DIR, "commands");
 const TEMPLATES_DIR = process.env.CLAUDE_GROUND_TEMPLATES_DIR || path.join(SCRIPT_DIR, "templates");
 
+const homeDir = process.env.HOME || process.env.USERPROFILE;
+const globalRulesDest = process.env.CLAUDE_RULES_DIR || path.join(homeDir, ".claude", "rules");
+const configPath = path.join(homeDir, ".claude", ".claude-ground.json");
+
+// ─── Theme ───────────────────────────────────────────────
 const supportsColor = process.platform !== "win32" || process.env.TERM;
 const c = {
   red:    supportsColor ? "\x1b[31m" : "",
   green:  supportsColor ? "\x1b[32m" : "",
   yellow: supportsColor ? "\x1b[33m" : "",
   cyan:   supportsColor ? "\x1b[36m" : "",
+  dim:    supportsColor ? "\x1b[2m"  : "",
   bold:   supportsColor ? "\x1b[1m"  : "",
   reset:  supportsColor ? "\x1b[0m"  : "",
 };
@@ -32,8 +39,19 @@ const c = {
 const ok   = `  ${c.green}✓${c.reset}`;
 const fail = `  ${c.red}✗${c.reset}`;
 const warn = `  ${c.yellow}!${c.reset}`;
-const line = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
 
+function banner(title, subtitle) {
+  console.log();
+  console.log(`  ${c.bold}${c.cyan}claude-ground${c.reset} ${c.dim}— ${title}${c.reset}`);
+  if (subtitle) console.log(`  ${c.dim}${subtitle}${c.reset}`);
+  console.log();
+}
+
+function section(title) {
+  console.log(`  ${c.bold}${title}${c.reset}`);
+}
+
+// ─── Helpers ─────────────────────────────────────────────
 function copyDir(src, dest) {
   fs.mkdirSync(dest, { recursive: true });
   for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
@@ -46,21 +64,6 @@ function copyDir(src, dest) {
 
 function exists(p) { return fs.existsSync(p); }
 function isDirEmpty(p) { return !exists(p) || fs.readdirSync(p).length === 0; }
-function ask(rl, q) { return new Promise((res) => rl.question(q, res)); }
-
-const availableLangs = fs
-  .readdirSync(RULES_DIR, { withFileTypes: true })
-  .filter((d) => d.isDirectory() && d.name !== "common")
-  .map((d) => d.name);
-
-const availableSkills = fs
-  .readdirSync(COMMANDS_DIR, { withFileTypes: true })
-  .filter((f) => f.isFile() && f.name.endsWith(".md"))
-  .map((f) => f.name.replace(/\.md$/, ""));
-
-const homeDir = process.env.HOME || process.env.USERPROFILE;
-const globalRulesDest = process.env.CLAUDE_RULES_DIR || path.join(homeDir, ".claude", "rules");
-const configPath = path.join(homeDir, ".claude", ".claude-ground.json");
 
 function loadConfig() {
   try { return JSON.parse(fs.readFileSync(configPath, "utf8")); }
@@ -73,112 +76,109 @@ function saveConfig(languages, skills) {
   fs.writeFileSync(configPath, JSON.stringify({ languages, skills }, null, 2) + "\n");
 }
 
-// --- Parse command ---
+// ─── Discovery ───────────────────────────────────────────
+const availableLangs = fs
+  .readdirSync(RULES_DIR, { withFileTypes: true })
+  .filter((d) => d.isDirectory() && d.name !== "common")
+  .map((d) => d.name);
+
+const skillDescriptions = {
+  "cg-mac-release":         "macOS app release pipeline (sign, notarize, DMG, GitHub release)",
+  "cg-devplan":             "Structured development plans for Claude Code",
+  "cg-store-listing":       "ASO-optimized App Store / Google Play metadata",
+  "cg-security-hardening":  "OWASP-aligned security hardening guide",
+  "cg-indie-deploy":        "Single-VPS deployment (Caddy, systemd, TLS, backups)",
+  "cg-indie-observability": "Structured logging, error tracking, uptime monitoring",
+  "cg-oss-git-hygiene":     "OSS repo setup (rulesets, signing, templates, triage)",
+};
+
+const availableSkills = fs
+  .readdirSync(COMMANDS_DIR, { withFileTypes: true })
+  .filter((f) => f.isFile() && f.name.endsWith(".md"))
+  .map((f) => f.name.replace(/\.md$/, ""));
+
+// ─── Parse command ───────────────────────────────────────
 const rawArgs = process.argv.slice(2);
-const commands = ["install", "init", "update", "help"];
-let command = rawArgs[0] && commands.includes(rawArgs[0]) ? rawArgs[0] : null;
+const validCommands = ["install", "init", "update", "help"];
+let command = rawArgs[0] && validCommands.includes(rawArgs[0]) ? rawArgs[0] : null;
 let args = command ? rawArgs.slice(1) : rawArgs;
 
-// No command given: default to "install" (interactive)
 if (!command && args.length === 0) command = "install";
-// Bare language args without command: default to "install" (non-interactive)
 if (!command && args.length > 0) command = "install";
 
+// ─── Help ────────────────────────────────────────────────
 function showHelp() {
+  banner("opinionated rules, skills & templates for Claude Code");
+  console.log("  Usage:");
+  console.log(`    ${c.cyan}claudeground${c.reset}                           Interactive global install`);
+  console.log(`    ${c.cyan}claudeground install${c.reset}                   Same as above`);
+  console.log(`    ${c.cyan}claudeground install go swift${c.reset}          Non-interactive — specific languages`);
+  console.log(`    ${c.cyan}claudeground init${c.reset}                      Set up current project`);
+  console.log(`    ${c.cyan}claudeground init go swift${c.reset}             Set up project for specific languages`);
+  console.log(`    ${c.cyan}claudeground update${c.reset}                    Re-install using saved preferences`);
+  console.log(`    ${c.cyan}claudeground help${c.reset}                      Show this help`);
   console.log();
-  console.log(`${c.bold}claude-ground${c.reset} — opinionated rules, skills & templates for Claude Code`);
-  console.log();
-  console.log("Usage:");
-  console.log(`  ${c.cyan}claudeground${c.reset}                           Interactive global install`);
-  console.log(`  ${c.cyan}claudeground install${c.reset}                   Same as above`);
-  console.log(`  ${c.cyan}claudeground install go swift${c.reset}          Non-interactive — specific languages`);
-  console.log(`  ${c.cyan}claudeground init${c.reset}                      Set up current project`);
-  console.log(`  ${c.cyan}claudeground init go swift${c.reset}             Set up project for specific languages`);
-  console.log(`  ${c.cyan}claudeground update${c.reset}                    Re-install using saved preferences`);
-  console.log(`  ${c.cyan}claudeground help${c.reset}                      Show this help`);
-  console.log();
-  console.log("Commands:");
-  console.log(`  ${c.bold}install${c.reset}   Install rules + skills globally (~/.claude/)`);
-  console.log(`  ${c.bold}init${c.reset}      Set up project templates (CLAUDE.md, DECISIONS.md, phases, skills)`);
-  console.log(`  ${c.bold}update${c.reset}    Re-install rules + skills using saved preferences from last install`);
-  console.log(`  ${c.bold}help${c.reset}      Show this help message`);
+  console.log("  Commands:");
+  console.log(`    ${c.bold}install${c.reset}   Install rules + skills globally (~/.claude/)`);
+  console.log(`    ${c.bold}init${c.reset}      Set up project (CLAUDE.md, DECISIONS.md, phases, skills)`);
+  console.log(`    ${c.bold}update${c.reset}    Re-install using saved preferences`);
+  console.log(`    ${c.bold}help${c.reset}      Show this help message`);
   console.log();
 }
 
-// --- Shared: language selection ---
-async function selectLanguages(rl, contextLabel) {
+// ─── Prompts ─────────────────────────────────────────────
+async function selectLanguages() {
   if (args.length > 0) {
-    // Non-interactive: validate args
-    const selected = [];
     for (const lang of args) {
-      if (!/^[a-zA-Z0-9_-]+$/.test(lang)) {
-        console.error(`${c.red}Error: invalid language name '${lang}'${c.reset}`);
-        process.exit(1);
-      }
       if (!availableLangs.includes(lang)) {
-        console.error(`${c.red}Error: no rules found for '${lang}'${c.reset}`);
-        console.error(`Available: ${availableLangs.join(", ")}`);
+        console.error(`\n  ${c.red}Error: no rules found for '${lang}'${c.reset}`);
+        console.error(`  Available: ${availableLangs.join(", ")}\n`);
         process.exit(1);
       }
-      selected.push(lang);
     }
-    return selected;
+    return [...args];
   }
 
-  console.log();
-  console.log(`${c.bold}Which languages do you use?${c.reset}`);
-  if (contextLabel) console.log(`${c.yellow}${contextLabel}${c.reset}`);
-  console.log();
-  console.log("Space-separated (e.g: go swift typescript) — or: all / none");
-  console.log();
-  console.log("Available languages:");
-  for (const lang of availableLangs) console.log(`  • ${lang}`);
-  console.log();
+  const selected = await checkbox({
+    message: "Select languages",
+    instructions: false,
+    choices: availableLangs.map((lang) => ({
+      name: lang,
+      value: lang,
+    })),
+    theme: {
+      prefix: "  ",
+      style: {
+        highlight: (text) => `${c.cyan}${text}${c.reset}`,
+      },
+    },
+  });
 
-  const input = await ask(rl, "Selection: ");
-
-  if (input.trim() === "all") return [...availableLangs];
-  if (input.trim() === "none" || input.trim() === "") return [];
-
-  const selected = input.trim().split(/\s+/).filter(Boolean);
-  for (const lang of selected) {
-    if (!availableLangs.includes(lang)) {
-      console.error(`${c.red}Error: '${lang}' not found. Available: ${availableLangs.join(", ")}${c.reset}`);
-      process.exit(1);
-    }
-  }
   return selected;
 }
 
-// --- Shared: skill selection ---
-async function selectSkills(rl) {
+async function selectSkills() {
   if (availableSkills.length === 0 || args.length > 0) return [];
 
-  console.log();
-  console.log(`${c.bold}Which skills (slash commands) do you want?${c.reset}`);
-  console.log();
-  console.log("Space-separated (e.g: mac-release) — or: all / none");
-  console.log();
-  console.log("Available skills:");
-  for (const skill of availableSkills) console.log(`  • ${skill}`);
-  console.log();
+  const selected = await checkbox({
+    message: "Select skills (slash commands)",
+    instructions: false,
+    choices: availableSkills.map((skill) => ({
+      name: `${skill}  ${c.dim}${skillDescriptions[skill] || ""}${c.reset}`,
+      value: skill,
+    })),
+    theme: {
+      prefix: "  ",
+      style: {
+        highlight: (text) => `${c.cyan}${text}${c.reset}`,
+      },
+    },
+  });
 
-  const input = await ask(rl, "Selection: ");
-
-  if (input.trim() === "all") return [...availableSkills];
-  if (input.trim() === "none" || input.trim() === "") return [];
-
-  const selected = input.trim().split(/\s+/).filter(Boolean);
-  for (const skill of selected) {
-    if (!availableSkills.includes(skill)) {
-      console.error(`${c.red}Error: '${skill}' not found. Available: ${availableSkills.join(", ")}${c.reset}`);
-      process.exit(1);
-    }
-  }
   return selected;
 }
 
-// --- Shared: install skills to a directory ---
+// ─── Install skills to a directory ───────────────────────
 function installSkills(selectedSkills, destDir, label) {
   if (selectedSkills.length === 0) return;
   fs.mkdirSync(destDir, { recursive: true });
@@ -186,108 +186,97 @@ function installSkills(selectedSkills, destDir, label) {
     const src = path.join(COMMANDS_DIR, `${skill}.md`);
     if (!exists(src)) { console.log(`${fail} No skill '${skill}', skipping.`); continue; }
     fs.copyFileSync(src, path.join(destDir, `${skill}.md`));
-    console.log(`${ok} /${skill} → ${label}/${skill}.md`);
+    console.log(`${ok} /${skill} → ${label}/`);
   }
 }
 
-// =============================================
-// COMMAND: install (global)
-// =============================================
-async function cmdInstall() {
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-
-  console.log();
-  console.log(`${c.bold}claude-ground installer${c.reset}`);
-  console.log(line);
-  console.log(`Target: ${c.cyan}global${c.reset} → ${globalRulesDest}`);
-  console.log("Active across all projects.");
-
-  const selectedLangs = await selectLanguages(rl, "common/ rules are always installed.");
-  const selectedSkills = await selectSkills(rl);
-
-  // Ask about project setup
-  let doInit = false;
-  if (args.length === 0) {
-    const ans = await ask(rl, "\nAlso set up current directory as a project? (CLAUDE.md, phases, etc.) [y/N]: ");
-    doInit = /^y/i.test(ans.trim());
+// ─── Install rules to a directory ────────────────────────
+function installRules(selectedLangs, dest) {
+  if (exists(dest) && !isDirEmpty(dest)) {
+    console.log(`  ${c.yellow}${dest} exists — files will be overwritten.${c.reset}`);
   }
 
-  rl.close();
-
-  // Install rules
-  console.log();
-  console.log(`${c.bold}Installing rules...${c.reset}`);
-  console.log(line);
-
-  if (exists(globalRulesDest) && !isDirEmpty(globalRulesDest)) {
-    console.log(`${c.yellow}Warning: ${globalRulesDest} already exists. Files will be overwritten.${c.reset}`);
-  }
-
-  copyDir(path.join(RULES_DIR, "common"), path.join(globalRulesDest, "common"));
-  console.log(`${ok} common → ${globalRulesDest}/common/`);
+  copyDir(path.join(RULES_DIR, "common"), path.join(dest, "common"));
+  console.log(`${ok} common/`);
 
   for (const lang of selectedLangs) {
     const langDir = path.join(RULES_DIR, lang);
-    if (!exists(langDir)) { console.log(`${fail} No rules for '${lang}', skipping.`); continue; }
-    copyDir(langDir, path.join(globalRulesDest, lang));
-    console.log(`${ok} ${lang} → ${globalRulesDest}/${lang}/`);
+    if (!exists(langDir)) { console.log(`${fail} ${lang} — not found, skipping.`); continue; }
+    copyDir(langDir, path.join(dest, lang));
+    console.log(`${ok} ${lang}/`);
+  }
+}
+
+// ═════════════════════════════════════════════════════════
+// COMMAND: install
+// ═════════════════════════════════════════════════════════
+async function cmdInstall() {
+  banner("global install", `Target: ${globalRulesDest}`);
+
+  const selectedLangs = await selectLanguages();
+  const selectedSkills = await selectSkills();
+
+  let doInit = false;
+  if (args.length === 0) {
+    doInit = await confirm({
+      message: "Also set up current directory as a project?",
+      default: false,
+      theme: { prefix: "\n  " },
+    });
   }
 
-  // Install skills globally
-  installSkills(selectedSkills, path.join(homeDir, ".claude", "commands"), "~/.claude/commands");
+  // Install
+  console.log();
+  section("Installing rules...");
+  installRules(selectedLangs, globalRulesDest);
 
-  // Save preferences for `claudeground update`
+  if (selectedSkills.length > 0) {
+    console.log();
+    section("Installing skills...");
+    installSkills(selectedSkills, path.join(homeDir, ".claude", "commands"), "~/.claude/commands");
+  }
+
   saveConfig(selectedLangs, selectedSkills);
-  console.log(`${ok} Preferences saved to ${configPath}`);
 
   // Summary
   console.log();
-  console.log(line);
-  console.log(`${c.green}${c.bold}Done.${c.reset}`);
+  console.log(`  ${c.green}${c.bold}Done.${c.reset}`);
   console.log();
-  console.log(`Rules installed to: ${c.cyan}${globalRulesDest}${c.reset}`);
-  if (selectedLangs.length > 0) console.log(`Languages: ${c.cyan}${selectedLangs.join(", ")}${c.reset}`);
-  if (selectedSkills.length > 0) console.log(`Skills: ${c.cyan}${selectedSkills.map((s) => "/" + s).join(", ")}${c.reset}`);
+  if (selectedLangs.length > 0) console.log(`  Languages: ${c.cyan}${selectedLangs.join(", ")}${c.reset}`);
+  if (selectedSkills.length > 0) console.log(`  Skills:    ${c.cyan}${selectedSkills.map((s) => "/" + s).join(", ")}${c.reset}`);
+  console.log(`  Config:    ${c.dim}${configPath}${c.reset}`);
 
-  // Chain into init if requested
   if (doInit) {
-    console.log();
     await runInit(selectedLangs, selectedSkills);
   } else {
     console.log();
-    console.log("Next: run `claudeground init` from your project directory to set up templates.");
+    console.log(`  Run ${c.cyan}claudeground init${c.reset} in your project directory to set up templates.`);
     console.log();
   }
 }
 
-// =============================================
-// COMMAND: init (project setup)
-// =============================================
+// ═════════════════════════════════════════════════════════
+// COMMAND: init
+// ═════════════════════════════════════════════════════════
 async function runInit(preSelectedLangs, preSelectedSkills) {
   const needsPrompt = !preSelectedLangs;
   let selectedLangs = preSelectedLangs || [];
   let selectedSkills = preSelectedSkills || [];
-  let hasUI = false;
-
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
   if (needsPrompt) {
-    console.log();
-    console.log(`${c.bold}claude-ground — project setup${c.reset}`);
-    console.log(line);
-    console.log(`Setting up: ${c.cyan}${process.cwd()}${c.reset}`);
-
-    selectedLangs = await selectLanguages(rl);
-    selectedSkills = await selectSkills(rl);
+    banner("project setup", `Directory: ${process.cwd()}`);
+    selectedLangs = await selectLanguages();
+    selectedSkills = await selectSkills();
   }
 
-  const uiAns = await ask(rl, "\nDoes this project have a UI? (uncomments frontend rules in CLAUDE.md) [y/N]: ");
-  hasUI = /^y/i.test(uiAns.trim());
-  rl.close();
+  const hasUI = await confirm({
+    message: "Does this project have a UI? (enables frontend rules in CLAUDE.md)",
+    default: false,
+    theme: { prefix: "\n  " },
+  });
 
   console.log();
-  console.log(`${c.bold}Setting up project...${c.reset}`);
-  console.log(line);
+  section("Setting up project...");
 
   const projectDir = process.cwd();
   const claudeDir = path.join(projectDir, ".claude");
@@ -321,8 +310,8 @@ async function runInit(preSelectedLangs, preSelectedSkills) {
       claudeMd = claudeMd.replace(`<!-- @rules/${lang}/${lang}.md -->`, `@rules/${lang}/${lang}.md`);
     }
     fs.writeFileSync(claudeMdDest, claudeMd);
-    console.log(`${ok} CLAUDE.md → project root${hasUI ? " (frontend enabled)" : ""}`);
-    if (selectedLangs.length > 0) console.log(`${ok} Language rules uncommented: ${selectedLangs.join(", ")}`);
+    console.log(`${ok} CLAUDE.md${hasUI ? " (frontend enabled)" : ""}`);
+    if (selectedLangs.length > 0) console.log(`${ok} Language rules: ${selectedLangs.join(", ")}`);
   }
 
   // DECISIONS.md
@@ -330,7 +319,7 @@ async function runInit(preSelectedLangs, preSelectedSkills) {
     console.log(`${warn} DECISIONS.md already exists, skipping.`);
   } else {
     fs.copyFileSync(path.join(TEMPLATES_DIR, "DECISIONS.md"), decisionsDest);
-    console.log(`${ok} DECISIONS.md → project root`);
+    console.log(`${ok} DECISIONS.md`);
   }
 
   // Phases
@@ -342,21 +331,22 @@ async function runInit(preSelectedLangs, preSelectedSkills) {
       path.join(TEMPLATES_DIR, "phases", "PHASE-01.md"),
       path.join(phasesDir, "PHASE-01-active.md")
     );
-    console.log(`${ok} .claude/phases/PHASE-01-active.md → project`);
+    console.log(`${ok} .claude/phases/PHASE-01-active.md`);
   }
 
   // Skills locally
-  installSkills(selectedSkills, path.join(claudeDir, "commands"), ".claude/commands");
+  if (selectedSkills.length > 0) {
+    installSkills(selectedSkills, path.join(claudeDir, "commands"), ".claude/commands");
+  }
 
   // Summary
   console.log();
-  console.log(line);
-  console.log(`${c.green}${c.bold}Project ready.${c.reset}`);
+  console.log(`  ${c.green}${c.bold}Project ready.${c.reset}`);
   console.log();
-  console.log("Next steps:");
-  console.log("  1. Fill in CLAUDE.md with your project details");
-  console.log("  2. Define your first phase in .claude/phases/PHASE-01-active.md");
-  console.log("  3. Log your initial stack decision in DECISIONS.md");
+  console.log(`  Next steps:`);
+  console.log(`    1. Fill in ${c.cyan}CLAUDE.md${c.reset} with your project details`);
+  console.log(`    2. Define your first phase in ${c.cyan}.claude/phases/PHASE-01-active.md${c.reset}`);
+  console.log(`    3. Log your initial stack decision in ${c.cyan}DECISIONS.md${c.reset}`);
   console.log();
 }
 
@@ -364,64 +354,63 @@ async function cmdInit() {
   await runInit(null, null);
 }
 
-// =============================================
-// COMMAND: update (re-install from saved config)
-// =============================================
+// ═════════════════════════════════════════════════════════
+// COMMAND: update
+// ═════════════════════════════════════════════════════════
 async function cmdUpdate() {
   const cfg = loadConfig();
   if (!cfg) {
-    console.error(`${c.red}No saved preferences found. Run \`claudeground install\` first.${c.reset}`);
+    console.error(`\n  ${c.red}No saved preferences found. Run \`claudeground install\` first.${c.reset}\n`);
     process.exit(1);
   }
 
   const { languages = [], skills = [] } = cfg;
 
-  console.log();
-  console.log(`${c.bold}claude-ground update${c.reset}`);
-  console.log(line);
-  console.log(`Languages: ${c.cyan}${languages.length > 0 ? languages.join(", ") : "none"}${c.reset}`);
-  console.log(`Skills: ${c.cyan}${skills.length > 0 ? skills.map((s) => "/" + s).join(", ") : "none"}${c.reset}`);
+  banner("update", "Re-installing from saved preferences");
 
-  // Install rules
+  console.log(`  Languages: ${c.cyan}${languages.length > 0 ? languages.join(", ") : "none"}${c.reset}`);
+  console.log(`  Skills:    ${c.cyan}${skills.length > 0 ? skills.map((s) => "/" + s).join(", ") : "none"}${c.reset}`);
+
   console.log();
-  console.log(`${c.bold}Updating rules...${c.reset}`);
-  console.log(line);
+  section("Updating rules...");
 
   copyDir(path.join(RULES_DIR, "common"), path.join(globalRulesDest, "common"));
-  console.log(`${ok} common → ${globalRulesDest}/common/`);
+  console.log(`${ok} common/`);
 
   for (const lang of languages) {
     const langDir = path.join(RULES_DIR, lang);
     if (!exists(langDir)) {
-      console.log(`${warn} '${lang}' no longer available, skipping.`);
+      console.log(`${warn} ${lang} — no longer available, skipping.`);
       continue;
     }
     copyDir(langDir, path.join(globalRulesDest, lang));
-    console.log(`${ok} ${lang} → ${globalRulesDest}/${lang}/`);
+    console.log(`${ok} ${lang}/`);
   }
 
-  // Install skills
-  const globalCmds = path.join(homeDir, ".claude", "commands");
-  for (const skill of skills) {
-    const src = path.join(COMMANDS_DIR, `${skill}.md`);
-    if (!exists(src)) {
-      console.log(`${warn} /${skill} no longer available, skipping.`);
-      continue;
+  if (skills.length > 0) {
+    console.log();
+    section("Updating skills...");
+    const globalCmds = path.join(homeDir, ".claude", "commands");
+    for (const skill of skills) {
+      const src = path.join(COMMANDS_DIR, `${skill}.md`);
+      if (!exists(src)) {
+        console.log(`${warn} /${skill} — no longer available, skipping.`);
+        continue;
+      }
+      fs.mkdirSync(globalCmds, { recursive: true });
+      fs.copyFileSync(src, path.join(globalCmds, `${skill}.md`));
+      console.log(`${ok} /${skill}`);
     }
-    fs.mkdirSync(globalCmds, { recursive: true });
-    fs.copyFileSync(src, path.join(globalCmds, `${skill}.md`));
-    console.log(`${ok} /${skill} → ~/.claude/commands/${skill}.md`);
   }
 
   console.log();
-  console.log(line);
-  console.log(`${c.green}${c.bold}Updated.${c.reset}`);
+  console.log(`  ${c.green}${c.bold}Updated.${c.reset}`);
   console.log();
 }
 
-// =============================================
+// ═════════════════════════════════════════════════════════
 // MAIN
-// =============================================
+// ═════════════════════════════════════════════════════════
 async function main() {
   switch (command) {
     case "install": return cmdInstall();
