@@ -99,7 +99,7 @@ const availableSkills = fs
 
 // ─── Parse command ───────────────────────────────────────
 const rawArgs = process.argv.slice(2);
-const validCommands = ["install", "init", "update", "help"];
+const validCommands = ["install", "init", "update", "uninstall", "help"];
 let command = rawArgs[0] && validCommands.includes(rawArgs[0]) ? rawArgs[0] : null;
 let args = command ? rawArgs.slice(1) : rawArgs;
 
@@ -116,13 +116,15 @@ function showHelp() {
   console.log(`    ${c.cyan}claudeground init${c.reset}                      Set up current project`);
   console.log(`    ${c.cyan}claudeground init go swift${c.reset}             Set up project for specific languages`);
   console.log(`    ${c.cyan}claudeground update${c.reset}                    Re-install using saved preferences`);
+  console.log(`    ${c.cyan}claudeground uninstall${c.reset}                 Remove installed rules, skills, and config`);
   console.log(`    ${c.cyan}claudeground help${c.reset}                      Show this help`);
   console.log();
   console.log("  Commands:");
-  console.log(`    ${c.bold}install${c.reset}   Install rules + skills globally (~/.claude/)`);
-  console.log(`    ${c.bold}init${c.reset}      Set up project (CLAUDE.md, DECISIONS.md, phases, skills)`);
-  console.log(`    ${c.bold}update${c.reset}    Re-install using saved preferences`);
-  console.log(`    ${c.bold}help${c.reset}      Show this help message`);
+  console.log(`    ${c.bold}install${c.reset}     Install rules + skills globally (~/.claude/)`);
+  console.log(`    ${c.bold}init${c.reset}        Set up project (CLAUDE.md, DECISIONS.md, phases, skills)`);
+  console.log(`    ${c.bold}update${c.reset}      Re-install using saved preferences`);
+  console.log(`    ${c.bold}uninstall${c.reset}   Remove installed rules, skills, and config`);
+  console.log(`    ${c.bold}help${c.reset}        Show this help message`);
   console.log();
 }
 
@@ -140,8 +142,9 @@ async function selectLanguages() {
   }
 
   const selected = await checkbox({
-    message: "Select languages",
+    message: `Select languages ${c.dim}(${availableLangs.length} available)${c.reset}`,
     instructions: false,
+    pageSize: 10,
     choices: availableLangs.map((lang) => ({
       name: lang,
       value: lang,
@@ -161,8 +164,9 @@ async function selectSkills() {
   if (availableSkills.length === 0 || args.length > 0) return [];
 
   const selected = await checkbox({
-    message: "Select skills (slash commands)",
+    message: `Select skills ${c.dim}(${availableSkills.length} available)${c.reset}`,
     instructions: false,
+    pageSize: 10,
     choices: availableSkills.map((skill) => ({
       name: `${skill}  ${c.dim}${skillDescriptions[skill] || ""}${c.reset}`,
       value: skill,
@@ -409,15 +413,155 @@ async function cmdUpdate() {
 }
 
 // ═════════════════════════════════════════════════════════
+// COMMAND: uninstall
+// ═════════════════════════════════════════════════════════
+async function cmdUninstall() {
+  const cfg = loadConfig();
+
+  banner("uninstall", "Select what to remove");
+
+  // Build list of removable items
+  const choices = [];
+
+  // Common rules (always installed)
+  const commonDir = path.join(globalRulesDest, "common");
+  if (exists(commonDir)) {
+    choices.push({
+      name: `common rules  ${c.dim}(${commonDir})${c.reset}`,
+      value: { type: "rule-dir", path: commonDir, label: "common/" },
+      checked: true,
+    });
+  }
+
+  // Language rules
+  const installedLangs = cfg?.languages || [];
+  for (const lang of installedLangs) {
+    const langDir = path.join(globalRulesDest, lang);
+    if (exists(langDir)) {
+      choices.push({
+        name: `${lang} rules  ${c.dim}(${langDir})${c.reset}`,
+        value: { type: "rule-dir", path: langDir, label: `${lang}/` },
+        checked: true,
+      });
+    }
+  }
+
+  // Also check for language dirs not in config (manually installed or from older version)
+  if (exists(globalRulesDest)) {
+    for (const entry of fs.readdirSync(globalRulesDest, { withFileTypes: true })) {
+      if (entry.isDirectory() && entry.name !== "common" && !installedLangs.includes(entry.name)) {
+        const langDir = path.join(globalRulesDest, entry.name);
+        choices.push({
+          name: `${entry.name} rules  ${c.dim}(${langDir})${c.reset}`,
+          value: { type: "rule-dir", path: langDir, label: `${entry.name}/` },
+          checked: true,
+        });
+      }
+    }
+  }
+
+  // Skills
+  const globalCmds = path.join(homeDir, ".claude", "commands");
+  if (exists(globalCmds)) {
+    for (const entry of fs.readdirSync(globalCmds, { withFileTypes: true })) {
+      if (entry.isFile() && entry.name.startsWith("cg-") && entry.name.endsWith(".md")) {
+        const skillName = entry.name.replace(/\.md$/, "");
+        const skillPath = path.join(globalCmds, entry.name);
+        choices.push({
+          name: `/${skillName}  ${c.dim}(${skillPath})${c.reset}`,
+          value: { type: "skill", path: skillPath, label: `/${skillName}` },
+          checked: true,
+        });
+      }
+    }
+  }
+
+  // Config file
+  if (exists(configPath)) {
+    choices.push({
+      name: `config  ${c.dim}(${configPath})${c.reset}`,
+      value: { type: "config", path: configPath, label: "config" },
+      checked: true,
+    });
+  }
+
+  if (choices.length === 0) {
+    console.log(`  Nothing to remove — claude-ground is not installed.`);
+    console.log();
+    return;
+  }
+
+  const toRemove = await checkbox({
+    message: `Select what to remove ${c.dim}(${choices.length} items)${c.reset}`,
+    instructions: false,
+    pageSize: 10,
+    choices,
+    theme: {
+      prefix: "  ",
+      style: {
+        highlight: (text) => `${c.red}${text}${c.reset}`,
+      },
+    },
+  });
+
+  if (toRemove.length === 0) {
+    console.log();
+    console.log(`  Nothing selected. No changes made.`);
+    console.log();
+    return;
+  }
+
+  const proceed = await confirm({
+    message: `Remove ${toRemove.length} item${toRemove.length > 1 ? "s" : ""}?`,
+    default: false,
+    theme: { prefix: "\n  " },
+  });
+
+  if (!proceed) {
+    console.log(`\n  Cancelled.\n`);
+    return;
+  }
+
+  console.log();
+  section("Removing...");
+
+  for (const item of toRemove) {
+    try {
+      if (item.type === "rule-dir") {
+        fs.rmSync(item.path, { recursive: true, force: true });
+      } else {
+        fs.unlinkSync(item.path);
+      }
+      console.log(`${ok} ${item.label}`);
+    } catch (err) {
+      console.log(`${fail} ${item.label} — ${err.message}`);
+    }
+  }
+
+  // Clean up empty rules dir
+  if (exists(globalRulesDest) && isDirEmpty(globalRulesDest)) {
+    fs.rmSync(globalRulesDest, { recursive: true, force: true });
+    console.log(`${ok} ${globalRulesDest} (empty, removed)`);
+  }
+
+  console.log();
+  console.log(`  ${c.green}${c.bold}Done.${c.reset}`);
+  console.log();
+  console.log(`  To fully remove the CLI: ${c.cyan}npm uninstall -g claude-ground${c.reset}`);
+  console.log();
+}
+
+// ═════════════════════════════════════════════════════════
 // MAIN
 // ═════════════════════════════════════════════════════════
 async function main() {
   switch (command) {
-    case "install": return cmdInstall();
-    case "init":    return cmdInit();
-    case "update":  return cmdUpdate();
-    case "help":    return showHelp();
-    default:        return showHelp();
+    case "install":   return cmdInstall();
+    case "init":      return cmdInit();
+    case "update":    return cmdUpdate();
+    case "uninstall": return cmdUninstall();
+    case "help":      return showHelp();
+    default:          return showHelp();
   }
 }
 
