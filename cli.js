@@ -90,6 +90,7 @@ const skillDescriptions = {
   "cg-indie-deploy":        "Single-VPS deployment (Caddy, systemd, TLS, backups)",
   "cg-indie-observability": "Structured logging, error tracking, uptime monitoring",
   "cg-oss-git-hygiene":     "OSS repo setup (rulesets, signing, templates, triage)",
+  "cg-senior-code-review":  "Findings-first senior code review of any change",
 };
 
 const availableSkills = fs

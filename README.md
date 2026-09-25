@@ -63,6 +63,7 @@ These aren't model failures — they're defaults that go unchallenged without ex
 | `cg-indie-deploy` | Deploy to a single VPS — Caddy/nginx, systemd, TLS, backups, rollback |
 | `cg-indie-observability` | Structured logging, error tracking, uptime monitoring, alerting |
 | `cg-oss-git-hygiene` | OSS repo setup — rulesets, signing, templates, Dependabot, triage |
+| `cg-senior-code-review` | Findings-first senior code review — security, regressions, concurrency, performance, with a verification pass |
 
 All rules use **MUST / SHOULD / RECOMMENDED** severity levels so Claude knows what is a hard rule vs a best practice.
 
@@ -206,7 +207,8 @@ claude-ground/
 │   ├── cg-security-hardening.md  # full security hardening guide
 │   ├── cg-indie-deploy.md        # VPS deployment guide
 │   ├── cg-indie-observability.md # production observability guide
-│   └── cg-oss-git-hygiene.md     # OSS repository setup guide
+│   ├── cg-oss-git-hygiene.md     # OSS repository setup guide
+│   └── cg-senior-code-review.md  # senior code review
 └── templates/
     ├── CLAUDE.md
     ├── DECISIONS.md
