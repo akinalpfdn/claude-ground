@@ -8,28 +8,48 @@ Applies to every project, every session, every language.
 
 Long implementations (3+ phases) use this system without exception.
 
-**File structure:**
+**File naming:** `PHASE-XXX-{CODE}-YY-{status}.md`
+
+| Part | Meaning |
+|------|---------|
+| `XXX` | **Project-global counter, always three digits** (`001`, `047`, `128`). Never resets. Increments across every phase group in the project. |
+| `{CODE}` | Short uppercase code for the phase group / workstream (`WIN`, `SAAS`, `AUTH`…) |
+| `YY` | **Counter within that group**, two digits. Resets to `01` for each new group. |
+| `{status}` | `done` \| `active` \| `pending` \| `backlog` |
+
 ```
 .claude/phases/
-  PHASE-01-done.md
-  PHASE-02-active.md     ← only one active at a time
-  PHASE-03-pending.md
+  PHASE-001-WIN-01-done.md
+  PHASE-006-WIN-06-backlog.md
+  PHASE-007-SAAS-01-active.md     ← only one active at a time
+  PHASE-010-SAAS-04-pending.md
 ```
+
+The global counter makes chronological order obvious across workstreams; the group counter keeps each workstream readable on its own.
+
+**Three digits is not cosmetic.** `ls` and every glob sort lexically, so with two digits `PHASE-99`
+sorts *after* `PHASE-127` and the tail of the list looks like the end of the project. A long-running
+project reads the wrong highest number and starts the next group on top of existing files. Pad on
+creation; if a project already has unpadded files, rename them all before adding to them.
+
+Renaming a directory that is already mixed-width: `printf "%03d" "$((10#$n))"` — without `10#`,
+`08` and `09` are parsed as invalid octal and collapse to `000`, silently overwriting each other.
 
 **MUST:**
 - Create ALL phase files at project start — one active, rest pending. Never create phase files incrementally.
 - One active phase at a time. Never start the next phase without explicit user approval.
 - When context fills, re-read the active phase file before continuing. Never rely on conversation history alone.
 - If the original plan needs to change, say so explicitly and ask before changing it. Do not silently replan.
-- Mark done by renaming: `PHASE-02-active.md` → `PHASE-02-done.md`
+- When starting a NEW phase group in an existing project, continue the global counter from the highest existing `XXX` — never restart at 001. Read the highest with `ls .claude/phases | sort -n`, never `ls | tail`.
+- Mark done by renaming the status suffix only: `PHASE-007-SAAS-01-active.md` → `PHASE-007-SAAS-01-done.md`
 
 **SHOULD:**
 - Phase files contain goal, tasks, acceptance criteria only. No code snippets — you will write the code, not read it back to yourself.
 
 **Phase file format:**
 ```markdown
-# Phase 02 — [Name]
-Status: ACTIVE | PENDING | DONE
+# Phase 007 (SAAS-01) — [Name]
+Status: ACTIVE | PENDING | DONE | BACKLOG
 
 ## Goal
 One sentence. What does this phase deliver?
@@ -161,3 +181,16 @@ Do not run all of them silently. Ask first. Run only what the user selects.
 **SHOULD:**
 - If doing something properly takes longer, say so and confirm before proceeding.
 - Prefer correct over fast. Technical debt compounds.
+
+---
+
+## 8. Response Style [MUST — primary focus]
+
+Long answers bury the details that matter. The user has asked for this repeatedly.
+
+**MUST (unless the user explicitly asks for detail):**
+- Short, plain, practical. Answer first, summary only.
+- No long sentences. No essays. No examples or background explanations.
+- A question gets an answer, not an article.
+- Questions to the user: visually separated from the rest (own block, e.g. `> ❓ ...`).
+- Anything that goes against the user's instructions or decisions: visually separated (own block, e.g. `> ⚠️ ...`).
