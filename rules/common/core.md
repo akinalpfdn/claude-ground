@@ -2,6 +2,8 @@
 
 Applies to every project, every session, every language.
 
+**Precedence [MUST]:** The user's explicit instruction in the current conversation overrides any rule. When a rule depends on a judgement call the user has not made (solo vs team project, which rule applies when two conflict), ask — do not decide silently.
+
 ---
 
 ## 1. Phase Management [MUST]
@@ -36,7 +38,7 @@ Renaming a directory that is already mixed-width: `printf "%03d" "$((10#$n))"` �
 `08` and `09` are parsed as invalid octal and collapse to `000`, silently overwriting each other.
 
 **MUST:**
-- Create ALL phase files at project start — one active, rest pending. Never create phase files incrementally.
+- When a phase group starts (at project start, or a new workstream later), create ALL phase files of that group at once — one active, rest pending. Never create a group's phases incrementally.
 - One active phase at a time. Never start the next phase without explicit user approval.
 - When context fills, re-read the active phase file before continuing. Never rely on conversation history alone.
 - If the original plan needs to change, say so explicitly and ask before changing it. Do not silently replan.
