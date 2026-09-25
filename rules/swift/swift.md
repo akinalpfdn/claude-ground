@@ -58,10 +58,13 @@ Task { await load() }
 
 Errors are enums conforming to `LocalizedError`. `try!` is forbidden in production. `try?` requires a comment explaining why discarding the error is intentional.
 
-ViewModels expose errors as published state, not thrown errors:
+ViewModels expose errors as observable state, not thrown errors:
 ```swift
-@Published var errorMessage: String?
+var errorMessage: String?              // @Observable
+@Published var errorMessage: String?   // ObservableObject
 ```
+
+Never mix `@Published` into an `@Observable` class — the two observation systems do not combine.
 
 ---
 

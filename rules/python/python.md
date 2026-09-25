@@ -82,11 +82,12 @@ except KeyError:
     user = create_user(user_id)
 
 # Correct
-if user_id in users:
-    user = users[user_id]
-else:
+user = users.get(user_id)
+if user is None:
     user = create_user(user_id)
 ```
+
+Exception: when a check can go stale before the action (file exists → open, lock free → acquire), attempt the action and catch the specific exception. Checking first is a race condition there.
 
 ---
 

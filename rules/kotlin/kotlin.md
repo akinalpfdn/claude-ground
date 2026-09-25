@@ -67,12 +67,19 @@ Domain models never contain `@SerializedName` or `@ColumnInfo`. Mapping happens 
 
 ## 5. Testing [SHOULD]
 
-ViewModel tests use `kotlinx-coroutines-test` with `TestCoroutineDispatcher`. Every ViewModel test replaces the main dispatcher:
+ViewModel tests use `kotlinx-coroutines-test` with `StandardTestDispatcher` and `runTest` (`TestCoroutineDispatcher` is deprecated). Every ViewModel test replaces the main dispatcher:
 
 ```kotlin
+private val testDispatcher = StandardTestDispatcher()
+
 @Before
 fun setup() {
     Dispatchers.setMain(testDispatcher)
+}
+
+@After
+fun tearDown() {
+    Dispatchers.resetMain()
 }
 ```
 

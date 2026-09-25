@@ -6,7 +6,7 @@ Extends `common/` rules.
 
 ## 1. Dependency Injection [MUST]
 
-Constructor injection only for mandatory dependencies. `[Autowired]` field injection is forbidden.
+Constructor injection only for mandatory dependencies. Property injection and service locator (`IServiceProvider.GetService<T>()` inside business code) are forbidden.
 
 Service lifetimes must be correct — captive dependency (Scoped injected into Singleton) is a runtime bug the compiler will not catch. Reason through lifetimes explicitly.
 
