@@ -333,10 +333,10 @@ async function runInit(preSelectedLangs, preSelectedSkills) {
   } else {
     fs.mkdirSync(phasesDir, { recursive: true });
     fs.copyFileSync(
-      path.join(TEMPLATES_DIR, "phases", "PHASE-01.md"),
-      path.join(phasesDir, "PHASE-01-active.md")
+      path.join(TEMPLATES_DIR, "phases", "PHASE-001.md"),
+      path.join(phasesDir, "PHASE-001-CORE-01-active.md")
     );
-    console.log(`${ok} .claude/phases/PHASE-01-active.md`);
+    console.log(`${ok} .claude/phases/PHASE-001-CORE-01-active.md`);
   }
 
   // Skills locally
@@ -350,7 +350,7 @@ async function runInit(preSelectedLangs, preSelectedSkills) {
   console.log();
   console.log(`  Next steps:`);
   console.log(`    1. Fill in ${c.cyan}CLAUDE.md${c.reset} with your project details`);
-  console.log(`    2. Define your first phase in ${c.cyan}.claude/phases/PHASE-01-active.md${c.reset}`);
+  console.log(`    2. Define your first phase in ${c.cyan}.claude/phases/PHASE-001-CORE-01-active.md${c.reset}`);
   console.log(`    3. Log your initial stack decision in ${c.cyan}DECISIONS.md${c.reset}`);
   console.log();
 }

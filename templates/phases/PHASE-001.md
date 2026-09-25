@@ -1,4 +1,4 @@
-# Phase 01 — [Name]
+# Phase 001 (CORE-01) — [Name]
 Status: ACTIVE
 
 ## Goal
@@ -18,3 +18,4 @@ Status: ACTIVE
 
 ---
 **Note:** No code snippets in phase files. Tasks are goals, not implementations.
+**Naming:** `PHASE-XXX-{CODE}-YY-{status}.md` — rename `CORE` to your workstream code (e.g. `AUTH`, `SAAS`).

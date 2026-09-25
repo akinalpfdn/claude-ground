@@ -71,7 +71,7 @@ All rules use **MUST / SHOULD / RECOMMENDED** severity levels so Claude knows wh
 
 - `CLAUDE.md` — Project context file. Tech stack, architecture, active rules.
 - `DECISIONS.md` — Empty decisions log, ready to fill.
-- `phases/PHASE-01.md` — First phase template.
+- `phases/PHASE-001.md` — First phase template.
 
 ---
 
@@ -122,7 +122,7 @@ your-project/
     ├── commands/                    ← project-level skills (if selected)
     │   └── cg-mac-release.md
     └── phases/
-        └── PHASE-01-active.md       ← define your first phase
+        └── PHASE-001-CORE-01-active.md  ← define your first phase
 ```
 
 ### Step 3 — Fill in CLAUDE.md
@@ -151,11 +151,13 @@ Long implementations use phase files to survive context resets:
 
 ```
 .claude/phases/
-├── PHASE-01-done.md       ← completed
-├── PHASE-02-done.md       ← completed
-├── PHASE-03-active.md     ← Claude reads this when context fills
-└── PHASE-04-pending.md    ← not started
+├── PHASE-001-CORE-01-done.md      ← completed
+├── PHASE-002-CORE-02-done.md      ← completed
+├── PHASE-003-AUTH-01-active.md    ← Claude reads this when context fills
+└── PHASE-004-AUTH-02-pending.md   ← not started
 ```
+
+Names follow `PHASE-XXX-{CODE}-YY-{status}.md`: a three-digit project-wide counter, a workstream code, and a counter within that workstream. All phase files are created up front — one active, the rest pending.
 
 Each phase file contains: goal, task list, acceptance criteria. No code snippets — phases are goals, not implementations.
 
@@ -213,7 +215,7 @@ claude-ground/
     ├── CLAUDE.md
     ├── DECISIONS.md
     └── phases/
-        └── PHASE-01.md
+        └── PHASE-001.md
 ```
 
 ---
