@@ -26,7 +26,7 @@ These aren't model failures — they're defaults that go unchallenged without ex
 
 | Rule file | What it does |
 |-----------|-------------|
-| `core.md` | Phase management, approval gates, honest opposition, time estimates, periodic analysis, response style |
+| `core.md` | Phase management, approval gates, honest opposition, time estimates, periodic analysis, response style, durable channels |
 | `decisions.md` | Decision log format and rules |
 | `git.md` | Branch strategy, conventional commits, short commit bodies, no attribution trailers, versioning |
 | `testing.md` | When to test, naming, structure, mocks vs integration, coverage |
