@@ -1,3 +1,9 @@
+---
+paths:
+  - "**/*.cs"
+  - "**/*.csproj"
+---
+
 # .NET / C# Rules
 
 Extends `common/` rules.

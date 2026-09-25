@@ -1,3 +1,9 @@
+---
+paths:
+  - "**/*.dart"
+  - "**/pubspec.yaml"
+---
+
 # Flutter / Dart Rules
 
 Extends `common/` rules and `common/frontend.md`.

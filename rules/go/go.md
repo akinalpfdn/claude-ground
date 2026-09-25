@@ -1,3 +1,9 @@
+---
+paths:
+  - "**/*.go"
+  - "**/go.mod"
+---
+
 # Go Rules
 
 Extends `common/` rules. Only rules that change behavior — not reminders of things already done correctly.

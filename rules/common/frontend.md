@@ -1,3 +1,10 @@
+---
+paths:
+  - "**/*.{tsx,jsx,vue,svelte,css,scss,html}"
+  - "**/*.swift"
+  - "**/*.dart"
+---
+
 # Frontend Rules
 
 Applies to any project with a user interface: web, mobile, desktop.

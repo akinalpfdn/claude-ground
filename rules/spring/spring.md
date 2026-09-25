@@ -1,3 +1,9 @@
+---
+paths:
+  - "**/*.java"
+  - "**/pom.xml"
+---
+
 # Spring / Java Rules
 
 Extends `common/` rules.

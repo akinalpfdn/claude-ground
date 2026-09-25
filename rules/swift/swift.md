@@ -1,3 +1,8 @@
+---
+paths:
+  - "**/*.swift"
+---
+
 # Swift Rules
 
 Extends `common/` rules. Assumes SwiftUI + modern Swift (5.9+).

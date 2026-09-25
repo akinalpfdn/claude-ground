@@ -32,7 +32,7 @@ These aren't model failures — they're defaults that go unchallenged without ex
 | `testing.md` | When to test, naming, structure, mocks vs integration, coverage |
 | `debug.md` | Two-attempt rule, structured analysis, no error masking |
 | `existing-code.md` | Read before touch, follow existing patterns, separate refactoring from features |
-| `frontend.md` | Theme-first, no inline styles, intentional design (UI projects only) |
+| `frontend.md` | Theme-first, no inline styles, intentional design (loads on UI files only) |
 | `security.md` | Input validation, auth, secrets, headers, rate limiting essentials (production) |
 | `deploy.md` | Server hardening, TLS, systemd, monitoring essentials (production) |
 | `observability.md` | Structured logging, health checks, external monitoring essentials (production) |
@@ -81,7 +81,7 @@ Three things get installed — they go to different places:
 
 | What | Where | Effect |
 |------|-------|--------|
-| **Rules** | `~/.claude/rules/` (global) | Active in every project, every session |
+| **Rules** | `~/.claude/rules/` (global) | `common/` loads every session; language rules and `frontend.md` load when a matching file is read |
 | **Skills** | `~/.claude/commands/` (global) | Slash commands available everywhere |
 | **Templates** | Current working directory | CLAUDE.md, DECISIONS.md, phases/ for one project |
 
@@ -102,17 +102,18 @@ claudeground install go typescript # non-interactive — specify languages direc
 
 This installs common rules + your chosen language rules to `~/.claude/rules/`, and selected skills to `~/.claude/commands/`. Done once, works everywhere.
 
+Language rules and `frontend.md` carry `paths:` frontmatter, so Claude Code loads them only when it reads a matching file (e.g. `go.md` on `*.go`). Common rules load in every session.
+
 ### Step 2 — Set up a project (per project)
 
 From your project directory:
 
 ```bash
 cd your-project
-claudeground init                  # interactive — pick languages, skills, UI
-claudeground init go swift         # non-interactive — specific languages
+claudeground init                  # interactive — pick project-level skills
 ```
 
-This asks if the project has a UI (to enable frontend rules), then creates:
+This creates:
 
 ```
 your-project/
@@ -130,7 +131,6 @@ your-project/
 Open `CLAUDE.md` and fill in:
 - What the project does
 - Your tech stack and why
-- Uncomment the language rules that apply
 - Any project-specific constraints for Claude
 
 ### Updating
@@ -179,7 +179,7 @@ claude-ground/
 │   │   ├── testing.md         # test discipline, naming, coverage
 │   │   ├── debug.md           # two-attempt rule, structured analysis
 │   │   ├── existing-code.md   # read before touch, pattern respect
-│   │   ├── frontend.md        # theme-first, intentional design (UI only)
+│   │   ├── frontend.md        # theme-first, intentional design (UI files only)
 │   │   ├── security.md        # security essentials → refs full guide
 │   │   ├── deploy.md          # deploy essentials → refs full guide
 │   │   ├── observability.md   # observability essentials → refs full guide

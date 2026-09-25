@@ -1,3 +1,9 @@
+---
+paths:
+  - "**/*.rs"
+  - "**/Cargo.toml"
+---
+
 # Rust Rules
 
 Extends `common/` rules.

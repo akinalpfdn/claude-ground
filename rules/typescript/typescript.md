@@ -1,3 +1,8 @@
+---
+paths:
+  - "**/*.{ts,tsx}"
+---
+
 # TypeScript / React Rules
 
 Extends `common/` rules and `common/frontend.md`.

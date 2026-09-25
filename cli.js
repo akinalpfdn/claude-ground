@@ -7,7 +7,6 @@
 //   claudeground install                   # same as above
 //   claudeground install go swift          # non-interactive — install rules globally
 //   claudeground init                      # interactive — set up project (CLAUDE.md, phases, skills)
-//   claudeground init go swift             # non-interactive — set up project for specific languages
 //   claudeground update                    # re-install rules + skills using saved preferences
 
 const fs = require("fs");
@@ -115,7 +114,6 @@ function showHelp() {
   console.log(`    ${c.cyan}claudeground install${c.reset}                   Same as above`);
   console.log(`    ${c.cyan}claudeground install go swift${c.reset}          Non-interactive — specific languages`);
   console.log(`    ${c.cyan}claudeground init${c.reset}                      Set up current project`);
-  console.log(`    ${c.cyan}claudeground init go swift${c.reset}             Set up project for specific languages`);
   console.log(`    ${c.cyan}claudeground update${c.reset}                    Re-install using saved preferences`);
   console.log(`    ${c.cyan}claudeground uninstall${c.reset}                 Remove installed rules, skills, and config`);
   console.log(`    ${c.cyan}claudeground help${c.reset}                      Show this help`);
@@ -252,7 +250,7 @@ async function cmdInstall() {
   console.log(`  Config:    ${c.dim}${configPath}${c.reset}`);
 
   if (doInit) {
-    await runInit(selectedLangs, selectedSkills);
+    await runInit(selectedSkills);
   } else {
     console.log();
     console.log(`  Run ${c.cyan}claudeground init${c.reset} in your project directory to set up templates.`);
@@ -263,22 +261,13 @@ async function cmdInstall() {
 // ═════════════════════════════════════════════════════════
 // COMMAND: init
 // ═════════════════════════════════════════════════════════
-async function runInit(preSelectedLangs, preSelectedSkills) {
-  const needsPrompt = !preSelectedLangs;
-  let selectedLangs = preSelectedLangs || [];
+async function runInit(preSelectedSkills) {
   let selectedSkills = preSelectedSkills || [];
 
-  if (needsPrompt) {
+  if (!preSelectedSkills) {
     banner("project setup", `Directory: ${process.cwd()}`);
-    selectedLangs = await selectLanguages();
     selectedSkills = await selectSkills();
   }
-
-  const hasUI = await confirm({
-    message: "Does this project have a UI? (enables frontend rules in CLAUDE.md)",
-    default: false,
-    theme: { prefix: "\n  " },
-  });
 
   console.log();
   section("Setting up project...");
@@ -291,32 +280,10 @@ async function runInit(preSelectedLangs, preSelectedSkills) {
 
   // CLAUDE.md
   if (exists(claudeMdDest)) {
-    const refs = [
-      "@rules/common/core.md",
-      "@rules/common/decisions.md",
-      "@rules/common/git.md",
-      "@rules/common/testing.md",
-      "@rules/common/debug.md",
-      "@rules/common/existing-code.md",
-    ];
-    if (hasUI) refs.push("@rules/common/frontend.md");
-    for (const lang of selectedLangs) refs.push(`@rules/${lang}/${lang}.md`);
-
-    console.log(`${warn} CLAUDE.md already exists. Add these lines to activate claude-ground:`);
-    console.log();
-    for (const ref of refs) console.log(`      ${c.cyan}${ref}${c.reset}`);
-    console.log();
+    console.log(`${warn} CLAUDE.md already exists, skipping.`);
   } else {
-    let claudeMd = fs.readFileSync(path.join(TEMPLATES_DIR, "CLAUDE.md"), "utf8");
-    if (hasUI) {
-      claudeMd = claudeMd.replace("<!-- @rules/common/frontend.md -->", "@rules/common/frontend.md");
-    }
-    for (const lang of selectedLangs) {
-      claudeMd = claudeMd.replace(`<!-- @rules/${lang}/${lang}.md -->`, `@rules/${lang}/${lang}.md`);
-    }
-    fs.writeFileSync(claudeMdDest, claudeMd);
-    console.log(`${ok} CLAUDE.md${hasUI ? " (frontend enabled)" : ""}`);
-    if (selectedLangs.length > 0) console.log(`${ok} Language rules: ${selectedLangs.join(", ")}`);
+    fs.copyFileSync(path.join(TEMPLATES_DIR, "CLAUDE.md"), claudeMdDest);
+    console.log(`${ok} CLAUDE.md`);
   }
 
   // DECISIONS.md
@@ -356,7 +323,7 @@ async function runInit(preSelectedLangs, preSelectedSkills) {
 }
 
 async function cmdInit() {
-  await runInit(null, null);
+  await runInit(null);
 }
 
 // ═════════════════════════════════════════════════════════

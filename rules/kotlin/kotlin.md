@@ -1,3 +1,8 @@
+---
+paths:
+  - "**/*.kt"
+---
+
 # Kotlin / Android Rules
 
 Extends `common/` rules and `common/frontend.md`.
